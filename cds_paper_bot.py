@@ -26,7 +26,6 @@ feedDict['CMS_PAPER_FEED'] = 'https://cds.cern.ch/rss?cc=CMS%20Publication%20Dra
 MAX_IMG_DIM = 2000
 # Maximum number of tweets
 MAX_TWEETS = 3
-# TODO: create avatar and background
 # TODO: tag actual experiment?
 # TODO: add some general tags?
 # TODO: Make certain keywords tags
@@ -333,13 +332,13 @@ def main():
     # loop over posts sorted by date
     tweetCount = 0
     for post in sorted(feed_entries, key=lambda x: maya.parse(x["published"]).datetime()):
-        tweetCount += 1
         downloaded_image_list = []
         logger.debug(post)
         identifier = post["dc_source"]
         if check_id_exists(identifier, post["feed_id"]):
             logger.info("%s has already been tweeted for feed %s" % (identifier, post["feed_id"]))
             continue
+        tweetCount += 1
         logger.info("{id} - published: {date}".format(id=identifier, date=maya.parse(post["published"]).datetime()))
         # if post is already in the database, skip it
         media_content = []
