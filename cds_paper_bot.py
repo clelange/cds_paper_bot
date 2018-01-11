@@ -353,7 +353,7 @@ def main():
             if "files/arXiv:" in media_url:
                 arXivId = media_url.rsplit("files/", 1)[1].strip(".pdf")
             # consider only attached Figures
-            if not "/files/Figure_" in media_url:
+            if "/files/Figure_" not in media_url:
                 continue
             media_found = True
             media_url = media_url.split("?", 1)[0]
