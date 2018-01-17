@@ -17,20 +17,19 @@ from wand.image import Image, Color
 import imageio
 
 
-postGif = True
+POST_GIF = True
 
-botHandle = "@CMS_results"
-feedDict = {}
-feedDict['CMS_PAS_FEED'] = 'https://cds.cern.ch/rss?cc=CMS%20Physics%20Analysis%20Summaries'
-feedDict['CMS_PAPER_FEED'] = 'https://cds.cern.ch/rss?cc=CMS%20Publication%20Drafts%20Final'
+BOT_HANDLE = "@CMS_results"
+FEED_DICT = {}
+FEED_DICT['CMS_PAS_FEED'] = 'https://cds.cern.ch/rss?cc=CMS%20Physics%20Analysis%20Summaries'
+FEED_DICT['CMS_PAPER_FEED'] = 'https://cds.cern.ch/rss?cc=CMS%20Publication%20Drafts%20Final'
 # Maximum image dimension (both x and y)
 MAX_IMG_DIM = 2000
-# Maximum number of tweets
-MAX_TWEETS = 3
 # TODO: tag actual experiment?
 # TODO: add some general tags?
 # TODO: Make certain keywords tags
-# collection could be: Higgs, NewPhysics, 13TeV/8TeV, StandardModel, resonances, DarkMatter, SUSY, BSM
+# collection could be: Higgs, NewPhysics, 13TeV/8TeV, StandardModel,
+# resonances, DarkMatter, SUSY, BSM
 # Also: CMSB2G, CMSHIG, CMSEXO etc.
 # TopQuark, BottomQuark Quark/Quarks, Tau
 
@@ -54,13 +53,14 @@ def format_title(title):
     except LatexWalkerError as identifier:
         logger.error(identifier)
         text_title = title
+    logger.debug(text_title)
     return text_title
-    logger.info(text_title)
 
 
 def execute_command(command):
     """execute shell command using subprocess..."""
-    proc = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, universal_newlines=True)
+    proc = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE, shell=True, universal_newlines=True)
     result = ""
     exit_code = proc.wait()
     if exit_code != 0:
@@ -106,7 +106,7 @@ def process_images(identifier, downloaded_image_list, use_wand=True, use_imageio
                     for i, _ in enumerate(max_dim):
                         if img.size[i] > max_dim[i]:
                             max_dim[i] = img.size[i]
-    if (max(max_dim[0], max_dim[1]) == 0):
+    if max(max_dim[0], max_dim[1]) == 0:
         for image_file in downloaded_image_list:
             if use_wand:
                 with Image(filename="{}[0]".format(image_file)) as img:
@@ -125,7 +125,8 @@ def process_images(identifier, downloaded_image_list, use_wand=True, use_imageio
                     img.background_color = Color('white')
                     img.compression_quality = 75
                     # resize to maximally the size of the converted PDFs
-                    logger.debug("img.size[0] = {}, img.size[1] = {}".format(img.size[0], img.size[1]))
+                    logger.debug("img.size[0] = {}, img.size[1] = {}".format(img.size[0],
+                                                                             img.size[1]))
                     side_to_scale = max(img.size[0], img.size[1])
                     scale_factor = max(max_dim[0], max_dim[1])/float(side_to_scale)
                     if scale_factor < 1:
@@ -147,7 +148,7 @@ def process_images(identifier, downloaded_image_list, use_wand=True, use_imageio
                 execute_command(command)
     # bring list in order again
     image_list = sorted(image_list)
-    if postGif:
+    if POST_GIF:
         # now we need another loop to create the gif canvas
         for image_file in image_list:
             with Image(filename=image_file) as foreground:
@@ -206,7 +207,7 @@ def upload_images(twitter, image_list):
     for image_path in sorted(image_list):
         with open(image_path, 'rb') as image:
             response = None
-            if postGif:
+            if POST_GIF:
                 if image_path.endswith("gif"):
                     try:
                         # while media_category="tweet_gif" should be used, this breaks the gif...
@@ -253,7 +254,7 @@ def split_text(identifier, title, link, short_url_length, maxlength):
             message = "{} {}".format(message, link)
             first_message = False
         else:
-            message = botHandle + " " + message
+            message = BOT_HANDLE + " " + message
         message_list.append(message)
     return message_list
 
@@ -275,7 +276,7 @@ def tweet(twitter, identifier, title, link, image_ids):
         logger.debug(len(message))
         if "id" in response:
             previous_status_id = response["id"]
-        if postGif:
+        if POST_GIF:
             if first_message:
                 try:
                     response = twitter.update_status(status=message, media_ids=image_ids)
@@ -285,13 +286,16 @@ def tweet(twitter, identifier, title, link, image_ids):
                 logger.debug(response)
             else:
                 try:
-                    response = twitter.update_status(status=message, in_reply_to_status_id=previous_status_id)
+                    response = twitter.update_status(status=message,
+                                                     in_reply_to_status_id=previous_status_id)
                 except TwythonError as twython_error:
                     print(twython_error)
                 logger.debug(response)
         else:
             try:
-                response = twitter.update_status(status=message, media_ids=image_ids[i*4:(i+1)*4], in_reply_to_status_id=previous_status_id)
+                response = twitter.update_status(status=message,
+                                                 media_ids=image_ids[i*4:(i+1)*4],
+                                                 in_reply_to_status_id=previous_status_id)
             except TwythonError as twython_error:
                 print(twython_error)
             logger.debug(response)
@@ -328,18 +332,21 @@ def main():
                         action="store_true")
     parser.add_argument("-a", "--analysis", help="tweet specific analysis",
                         type=str)
+    parser.add_argument("-m", "--max", help="maximum number of analyses to tweet",
+                        type=int, default=3)
     args = parser.parse_args()
+    max_tweets = args.max
     if args.dry:
         dry_run = True
     if args.analysis:
         analysis_id = args.analysis
-        MAX_TWEETS = 1
+        max_tweets = 1
         logger.info("Looking for analysis with ID %s" % (analysis_id))
 
     feed_entries = []
-    for key in feedDict:
+    for key in FEED_DICT:
         logger.info("Getting feed for %s" % key)
-        this_feed = read_feed(feedDict[key])
+        this_feed = read_feed(FEED_DICT[key])
         this_feed_entries = this_feed["entries"]
         logger.info("Found %d items" % len(this_feed_entries))
         # add feed info to entries so that we can loop more easily later
@@ -348,7 +355,7 @@ def main():
         feed_entries += this_feed_entries
     twitter = twitter_auth()
     # loop over posts sorted by date
-    tweetCount = 0
+    tweet_count = 0
     for post in sorted(feed_entries, key=lambda x: maya.parse(x["published"]).datetime()):
         downloaded_image_list = []
         logger.debug(post)
@@ -361,11 +368,12 @@ def main():
         elif check_id_exists(identifier, post["feed_id"]):
             logger.info("%s has already been tweeted for feed %s" % (identifier, post["feed_id"]))
             continue
-        tweetCount += 1
-        logger.info("{id} - published: {date}".format(id=identifier, date=maya.parse(post["published"]).datetime()))
+        tweet_count += 1
+        logger.info("{id} - published: {date}".format(id=identifier,
+                                                      date=maya.parse(post["published"]).datetime()))
         # if post is already in the database, skip it
         media_content = []
-        arXivId = ""
+        arxiv_id = ""
         if "media_content" in post:
             media_content += post["media_content"]
         if not os.path.exists(identifier):
@@ -374,7 +382,7 @@ def main():
             media_url = media["url"]
             # try to find arXiv ID
             if "files/arXiv:" in media_url:
-                arXivId = media_url.rsplit("files/", 1)[1].strip(".pdf")
+                arxiv_id = media_url.rsplit("files/", 1)[1].strip(".pdf")
             # consider only attached Figures
             if "/files/Figure_" not in media_url:
                 continue
@@ -402,12 +410,12 @@ def main():
 
         title = post.title
         link = post.link
-        if arXivId:
-            arXivLink = "https://arxiv.org/abs/%s" % arXivId.rsplit(":")[1]
-            logger.debug(arXivLink)
-            request = requests.get(arXivLink)
+        if arxiv_id:
+            arxiv_link = "https://arxiv.org/abs/%s" % arxiv_id.rsplit(":")[1]
+            logger.debug(arxiv_link)
+            request = requests.get(arxiv_link)
             if request.status_code < 400:
-                link = arXivLink
+                link = arxiv_link
         title_formatted = format_title(title)
         if sys.version_info[0] < 3:
             title_formatted = title_formatted.encode('utf8')
@@ -415,7 +423,7 @@ def main():
         if not dry_run:
             tweet(twitter, identifier, title_formatted, link, image_ids)
             store_id(identifier, post["feed_id"])
-        if tweetCount >= MAX_TWEETS:
+        if tweet_count >= max_tweets:
             return
 
 
