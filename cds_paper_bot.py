@@ -2,6 +2,7 @@
 from __future__ import print_function
 import os
 import sys
+import argparse
 import shutil
 import logging
 import subprocess
@@ -318,6 +319,18 @@ def store_id(identifier, feed_id):
 
 def main():
     """Main function."""
+    dryRun = False # run without tweeting
+
+    # parse arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-d", "--dry", help="perform dry run without tweeting",
+                        action="store_true")
+    parser.add_argument("--id", help="tweet specific analysis ID",
+                        action="store_true")
+    args = parser.parse_args()
+    if args.dry:
+        dryRun = True
+
     feed_entries = []
     for key in feedDict:
         logger.info("Getting feed for %s" % key)
@@ -389,8 +402,9 @@ def main():
         if sys.version_info[0] < 3:
             title_formatted = title_formatted.encode('utf8')
         logger.info("{}: {} {}".format(identifier, title_formatted, link))
-        tweet(twitter, identifier, title_formatted, link, image_ids)
-        store_id(identifier, post["feed_id"])
+        if not dryRun:
+            tweet(twitter, identifier, title_formatted, link, image_ids)
+            store_id(identifier, post["feed_id"])
         if tweetCount >= MAX_TWEETS:
             return
 
