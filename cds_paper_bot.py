@@ -319,17 +319,22 @@ def store_id(identifier, feed_id):
 
 def main():
     """Main function."""
-    dryRun = False # run without tweeting
+    dry_run = False # run without tweeting
+    analysis_id = ""
 
     # parse arguments
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--dry", help="perform dry run without tweeting",
                         action="store_true")
-    parser.add_argument("--id", help="tweet specific analysis ID",
-                        action="store_true")
+    parser.add_argument("-a", "--analysis", help="tweet specific analysis",
+                        type=str)
     args = parser.parse_args()
     if args.dry:
-        dryRun = True
+        dry_run = True
+    if args.analysis:
+        analysis_id = args.analysis
+        MAX_TWEETS = 1
+        logger.info("Looking for analysis with ID %s" % (analysis_id))
 
     feed_entries = []
     for key in feedDict:
@@ -348,7 +353,12 @@ def main():
         downloaded_image_list = []
         logger.debug(post)
         identifier = post["dc_source"]
-        if check_id_exists(identifier, post["feed_id"]):
+        if analysis_id:
+            if analysis_id not in identifier:
+                continue
+            else:
+                logger.info("Found %s in feed %s" % (identifier, post["feed_id"]))
+        elif check_id_exists(identifier, post["feed_id"]):
             logger.info("%s has already been tweeted for feed %s" % (identifier, post["feed_id"]))
             continue
         tweetCount += 1
@@ -402,7 +412,7 @@ def main():
         if sys.version_info[0] < 3:
             title_formatted = title_formatted.encode('utf8')
         logger.info("{}: {} {}".format(identifier, title_formatted, link))
-        if not dryRun:
+        if not dry_run:
             tweet(twitter, identifier, title_formatted, link, image_ids)
             store_id(identifier, post["feed_id"])
         if tweetCount >= MAX_TWEETS:
