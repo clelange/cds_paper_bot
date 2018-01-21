@@ -17,8 +17,6 @@ from wand.image import Image, Color
 import imageio
 
 
-POST_GIF = True
-
 BOT_HANDLE = "@CMS_results"
 FEED_DICT = {}
 FEED_DICT[
@@ -26,7 +24,7 @@ FEED_DICT[
 FEED_DICT[
     'CMS_PAPER_FEED'] = 'https://cds.cern.ch/rss?cc=CMS%20Publication%20Drafts%20Final'
 # Maximum image dimension (both x and y)
-MAX_IMG_DIM = 2000
+MAX_IMG_DIM = 1200
 # TODO: tag actual experiment?
 # TODO: add some general tags?
 # TODO: Make certain keywords tags
@@ -75,7 +73,7 @@ def execute_command(command):
         logger.debug(result)
 
 
-def process_images(identifier, downloaded_image_list, use_wand=True, use_imageio=True):
+def process_images(identifier, downloaded_image_list, post_gif, use_wand=True, use_imageio=True):
     """Convert/resize all images to png."""
     logger.info("Processing images.")
     logger.debug("process_images(): identifier = {}, downloaded_image_list = {},\
@@ -156,7 +154,7 @@ def process_images(identifier, downloaded_image_list, use_wand=True, use_imageio
                 execute_command(command)
     # bring list in order again
     image_list = sorted(image_list)
-    if POST_GIF:
+    if post_gif:
         # now we need another loop to create the gif canvas
         for image_file in image_list:
             with Image(filename=image_file) as foreground:
@@ -205,10 +203,12 @@ def twitter_auth():
         )
     except TwythonError as twython_error:
         print(twython_error)
+        logger.error(twitter)
+        sys.exit(1)
     return twitter
 
 
-def upload_images(twitter, image_list):
+def upload_images(twitter, image_list, post_gif):
     """Upload images to twitter and return locations."""
     logger.info("Uploading images.")
     image_ids = []
@@ -216,7 +216,7 @@ def upload_images(twitter, image_list):
     for image_path in sorted(image_list):
         with open(image_path, 'rb') as image:
             response = None
-            if POST_GIF:
+            if post_gif:
                 if image_path.endswith("gif"):
                     try:
                         # while media_category="tweet_gif" should be used, this breaks the gif...
@@ -224,6 +224,8 @@ def upload_images(twitter, image_list):
                         response = twitter.upload_media(media=image)
                     except TwythonError as twython_error:
                         print(twython_error)
+                        logger.error(response)
+                        sys.exit(1)
                     logger.info(response)
                     image_ids.append(response["media_id"])
             else:
@@ -231,6 +233,8 @@ def upload_images(twitter, image_list):
                     response = twitter.upload_media(media=image)
                 except TwythonError as twython_error:
                     print(twython_error)
+                    logger.error(response)
+                    sys.exit(1)
                 logger.debug(response)
                 image_ids.append(response["media_id"])
     logger.debug(image_ids)
@@ -268,7 +272,7 @@ def split_text(identifier, title, link, short_url_length, maxlength):
     return message_list
 
 
-def tweet(twitter, identifier, title, link, image_ids):
+def tweet(twitter, identifier, title, link, image_ids, post_gif):
     """tweet the new results with title and link and pictures taking care of length limitations."""
     logger.info("Creating tweet.")
     # https://dev.twitter.com/rest/reference/get/help/configuration
@@ -286,13 +290,15 @@ def tweet(twitter, identifier, title, link, image_ids):
         logger.debug(len(message))
         if "id" in response:
             previous_status_id = response["id"]
-        if POST_GIF:
+        if post_gif:
             if first_message:
                 try:
                     response = twitter.update_status(
                         status=message, media_ids=image_ids)
                 except TwythonError as twython_error:
                     print(twython_error)
+                    logger.error(response)
+                    sys.exit(1)
                 first_message = False
                 logger.debug(response)
             else:
@@ -301,6 +307,8 @@ def tweet(twitter, identifier, title, link, image_ids):
                                                      in_reply_to_status_id=previous_status_id)
                 except TwythonError as twython_error:
                     print(twython_error)
+                    logger.error(response)
+                    return None
                 logger.debug(response)
         else:
             try:
@@ -310,7 +318,10 @@ def tweet(twitter, identifier, title, link, image_ids):
                                                  in_reply_to_status_id=previous_status_id)
             except TwythonError as twython_error:
                 print(twython_error)
+                logger.error(response)
+                return None
             logger.debug(response)
+    return response
 
 
 def check_id_exists(identifier, feed_id):
@@ -339,6 +350,7 @@ def main():
     analysis_id = ""
     keep_image_dir = False
     list_analyses = False
+    post_gif = True
 
     # parse arguments
     parser = argparse.ArgumentParser()
@@ -352,6 +364,8 @@ def main():
                         action="store_true")
     parser.add_argument("-l", "--list", help="list analyses for feeds, then quit",
                         action="store_true")
+    parser.add_argument("-g", "--nogif", help="do not create GIF",
+                        action="store_true")
     args = parser.parse_args()
     max_tweets = args.max
     if args.dry:
@@ -360,6 +374,8 @@ def main():
         keep_image_dir = True
     if args.list:
         list_analyses = True
+    if args.nogif:
+        post_gif = False
     if args.analysis:
         analysis_id = args.analysis
         max_tweets = 1
@@ -435,11 +451,9 @@ def main():
                         request.raw.decode_content = True
                         shutil.copyfileobj(request.raw, file_handler)
                     downloaded_image_list.append(out_path)
-        image_list = process_images(identifier, downloaded_image_list)
-        image_ids = upload_images(twitter, image_list)
-        if not keep_image_dir:
-            # clean up images
-            shutil.rmtree(identifier)
+        image_list = process_images(
+            identifier, downloaded_image_list, post_gif)
+        image_ids = upload_images(twitter, image_list, post_gif)
 
         title = post.title
         link = post.link
@@ -454,8 +468,29 @@ def main():
             title_formatted = title_formatted.encode('utf8')
         logger.info("{}: {} {}".format(identifier, title_formatted, link))
         if not dry_run:
-            tweet(twitter, identifier, title_formatted, link, image_ids)
-            store_id(identifier, post["feed_id"])
+            tweet_response = tweet(twitter, identifier,
+                                   title_formatted, link, image_ids, post_gif)
+            if not tweet_response:
+                # try to recover since something went wrong
+                # first, try to use individual images instead of GIF
+                if post_gif:
+                    logger.info("Trying to tweet without GIF")
+                    image_list = process_images(
+                        identifier, downloaded_image_list, post_gif=False)
+                    image_ids = upload_images(
+                        twitter, image_list, post_gif=False)
+                    tweet_response = tweet(
+                        twitter, identifier, title_formatted, link, image_ids, post_gif=False)
+            if not tweet_response:
+                # second, try to tweet without image
+                logger.info("Trying to tweet without images")
+                tweet_response = tweet(
+                    twitter, identifier, title_formatted, link, image_ids=[], post_gif=False)
+            if tweet_response:
+                store_id(identifier, post["feed_id"])
+        if not keep_image_dir:
+            # clean up images
+            shutil.rmtree(identifier)
         if tweet_count >= max_tweets:
             return
 
