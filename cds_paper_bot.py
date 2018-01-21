@@ -323,8 +323,9 @@ def store_id(identifier, feed_id):
 
 def main():
     """Main function."""
-    dry_run = False # run without tweeting
+    dry_run = False  # run without tweeting
     analysis_id = ""
+    keep_image_dir = False
 
     # parse arguments
     parser = argparse.ArgumentParser()
@@ -334,10 +335,14 @@ def main():
                         type=str)
     parser.add_argument("-m", "--max", help="maximum number of analyses to tweet",
                         type=int, default=3)
+    parser.add_argument("-k", "--keep", help="keep image directory",
+                        action="store_true")
     args = parser.parse_args()
     max_tweets = args.max
     if args.dry:
         dry_run = True
+    if args.keep:
+        keep_image_dir = True
     if args.analysis:
         analysis_id = args.analysis
         max_tweets = 1
@@ -405,8 +410,9 @@ def main():
                     downloaded_image_list.append(out_path)
         image_list = process_images(identifier, downloaded_image_list)
         image_ids = upload_images(twitter, image_list)
-        # clean up images
-        shutil.rmtree(identifier)
+        if not keep_image_dir:
+            # clean up images
+            shutil.rmtree(identifier)
 
         title = post.title
         link = post.link
