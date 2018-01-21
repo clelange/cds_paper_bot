@@ -21,8 +21,10 @@ POST_GIF = True
 
 BOT_HANDLE = "@CMS_results"
 FEED_DICT = {}
-FEED_DICT['CMS_PAS_FEED'] = 'https://cds.cern.ch/rss?cc=CMS%20Physics%20Analysis%20Summaries'
-FEED_DICT['CMS_PAPER_FEED'] = 'https://cds.cern.ch/rss?cc=CMS%20Publication%20Drafts%20Final'
+FEED_DICT[
+    'CMS_PAS_FEED'] = 'https://cds.cern.ch/rss?cc=CMS%20Physics%20Analysis%20Summaries'
+FEED_DICT[
+    'CMS_PAPER_FEED'] = 'https://cds.cern.ch/rss?cc=CMS%20Publication%20Drafts%20Final'
 # Maximum image dimension (both x and y)
 MAX_IMG_DIM = 2000
 # TODO: tag actual experiment?
@@ -78,7 +80,7 @@ def process_images(identifier, downloaded_image_list, use_wand=True, use_imageio
     logger.info("Processing images.")
     logger.debug("process_images(): identifier = {}, downloaded_image_list = {},\
                   use_wand = {}, use_imageio = {}".format(
-                      identifier, downloaded_image_list, use_wand, use_imageio))
+        identifier, downloaded_image_list, use_wand, use_imageio))
     image_list = []
     images_for_gif = []
     max_dim = [0, 0]
@@ -88,17 +90,20 @@ def process_images(identifier, downloaded_image_list, use_wand=True, use_imageio
     for image_file in downloaded_image_list:
         if image_file.endswith('pdf'):
             if use_wand:
-                with Image(filename="{}[0]".format(image_file)) as img:  # , resolution=300
+                # , resolution=300
+                with Image(filename="{}[0]".format(image_file)) as img:
                     # process pdfs here only, others seem to be far too big
                     img.format = new_image_format
                     img.background_color = Color('white')
                     if (img.size[0] > MAX_IMG_DIM) or (img.size[1] > MAX_IMG_DIM):
-                        img.resize(int(img.size[0]*.5), int(img.size[1]*.5))
+                        img.resize(int(img.size[0] * .5),
+                                   int(img.size[1] * .5))
                     img.compression_quality = 75
                     filename = image_file
                     img.alpha_channel = 'remove'
                     img.trim()
-                    filename = filename.replace(".pdf", ".%s" % new_image_format)
+                    filename = filename.replace(
+                        ".pdf", ".%s" % new_image_format)
                     # save image in list
                     image_list.append(filename)
                     img.save(filename=filename)
@@ -111,7 +116,8 @@ def process_images(identifier, downloaded_image_list, use_wand=True, use_imageio
             if use_wand:
                 with Image(filename="{}[0]".format(image_file)) as img:
                     if (img.size[0] > MAX_IMG_DIM) or (img.size[1] > MAX_IMG_DIM):
-                        img.resize(int(img.size[0]*.5), int(img.size[1]*.5))
+                        img.resize(int(img.size[0] * .5),
+                                   int(img.size[1] * .5))
                     for i, _ in enumerate(max_dim):
                         if img.size[i] > max_dim[i]:
                             max_dim[i] = img.size[i]
@@ -128,9 +134,11 @@ def process_images(identifier, downloaded_image_list, use_wand=True, use_imageio
                     logger.debug("img.size[0] = {}, img.size[1] = {}".format(img.size[0],
                                                                              img.size[1]))
                     side_to_scale = max(img.size[0], img.size[1])
-                    scale_factor = max(max_dim[0], max_dim[1])/float(side_to_scale)
+                    scale_factor = max(max_dim[0], max_dim[
+                                       1]) / float(side_to_scale)
                     if scale_factor < 1:
-                        img.resize(int(img.size[0]*scale_factor), int(img.size[1]*scale_factor))
+                        img.resize(
+                            int(img.size[0] * scale_factor), int(img.size[1] * scale_factor))
                     # give the file a different name
                     filesplit = image_file.rsplit(".", 1)
                     filename = filesplit[0] + "_." + filesplit[1]
@@ -153,7 +161,8 @@ def process_images(identifier, downloaded_image_list, use_wand=True, use_imageio
         for image_file in image_list:
             with Image(filename=image_file) as foreground:
                 foreground.format = 'gif'
-                image_file = image_file.replace('.%s' % new_image_format, '.gif')
+                image_file = image_file.replace(
+                    '.%s' % new_image_format, '.gif')
                 # foreground.transform(resize="{0}x{1}".format(*max_dim))
                 with Image(width=max_dim[0], height=max_dim[1], background=Color('white')) as out:
                     left = int((max_dim[0] - foreground.size[0]) / 2)
@@ -240,14 +249,14 @@ def split_text(identifier, title, link, short_url_length, maxlength):
         if first_message:
             allowed_length = maxlength
         else:
-            message = ".."+message
+            message = ".." + message
         if len(message) > allowed_length:
             # strip message at last whitespace and account for 3 dots
-            cut_position = message[:allowed_length-3].rfind(" ")
+            cut_position = message[:allowed_length - 3].rfind(" ")
             message = message[:cut_position]
             remaining_text = remaining_text[cut_position:]
-            if cut_position+3 > len(remaining_text):
-                message = message.strip()+".."
+            if cut_position + 3 > len(remaining_text):
+                message = message.strip() + ".."
         else:
             remaining_text = ""
         if first_message:
@@ -264,7 +273,8 @@ def tweet(twitter, identifier, title, link, image_ids):
     logger.info("Creating tweet.")
     # https://dev.twitter.com/rest/reference/get/help/configuration
     tweet_length = 280
-    short_url_length = len(link)  # twitter.get_twitter_configuration()['short_url_length']
+    # twitter.get_twitter_configuration()['short_url_length']
+    short_url_length = len(link)
     maxlength = tweet_length - short_url_length
 
     message_list = split_text(identifier, title, link, tweet_length, maxlength)
@@ -279,7 +289,8 @@ def tweet(twitter, identifier, title, link, image_ids):
         if POST_GIF:
             if first_message:
                 try:
-                    response = twitter.update_status(status=message, media_ids=image_ids)
+                    response = twitter.update_status(
+                        status=message, media_ids=image_ids)
                 except TwythonError as twython_error:
                     print(twython_error)
                 first_message = False
@@ -294,7 +305,8 @@ def tweet(twitter, identifier, title, link, image_ids):
         else:
             try:
                 response = twitter.update_status(status=message,
-                                                 media_ids=image_ids[i*4:(i+1)*4],
+                                                 media_ids=image_ids[
+                                                     i * 4:(i + 1) * 4],
                                                  in_reply_to_status_id=previous_status_id)
             except TwythonError as twython_error:
                 print(twython_error)
@@ -326,6 +338,7 @@ def main():
     dry_run = False  # run without tweeting
     analysis_id = ""
     keep_image_dir = False
+    list_analyses = False
 
     # parse arguments
     parser = argparse.ArgumentParser()
@@ -337,12 +350,16 @@ def main():
                         type=int, default=3)
     parser.add_argument("-k", "--keep", help="keep image directory",
                         action="store_true")
+    parser.add_argument("-l", "--list", help="list analyses for feeds, then quit",
+                        action="store_true")
     args = parser.parse_args()
     max_tweets = args.max
     if args.dry:
         dry_run = True
     if args.keep:
         keep_image_dir = True
+    if args.list:
+        list_analyses = True
     if args.analysis:
         analysis_id = args.analysis
         max_tweets = 1
@@ -358,6 +375,13 @@ def main():
         for index, _ in enumerate(this_feed_entries):
             this_feed_entries[index]["feed_id"] = key
         feed_entries += this_feed_entries
+    if list_analyses:
+        # sort by feed_id, then date
+        logger.info("List of available analyses:")
+        for post in sorted(feed_entries, key=lambda x: (x["feed_id"], maya.parse(x["published"]).datetime())):
+            logger.info(" - {post_id} ({feed_id}), published {date}".format(
+                post_id=post["dc_source"], feed_id=post["feed_id"], date=post["published"]))
+        return
     twitter = twitter_auth()
     # loop over posts sorted by date
     tweet_count = 0
@@ -369,9 +393,11 @@ def main():
             if analysis_id not in identifier:
                 continue
             else:
-                logger.info("Found %s in feed %s" % (identifier, post["feed_id"]))
+                logger.info("Found %s in feed %s" %
+                            (identifier, post["feed_id"]))
         elif check_id_exists(identifier, post["feed_id"]):
-            logger.info("%s has already been tweeted for feed %s" % (identifier, post["feed_id"]))
+            logger.info("%s has already been tweeted for feed %s" %
+                        (identifier, post["feed_id"]))
             continue
         tweet_count += 1
         logger.info("{id} - published: {date}".format(id=identifier,
@@ -401,7 +427,8 @@ def main():
 
             if media_found:
                 # download images
-                out_path = "{}/{}".format(identifier, media_url.rsplit("/", 1)[1])
+                out_path = "{}/{}".format(identifier,
+                                          media_url.rsplit("/", 1)[1])
                 request = requests.get(media_url, stream=True)
                 if request.status_code == 200:
                     with open(out_path, 'wb') as file_handler:
