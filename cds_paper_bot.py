@@ -412,7 +412,7 @@ def main():
                 logger.info("Found %s in feed %s" %
                             (identifier, post["feed_id"]))
         elif check_id_exists(identifier, post["feed_id"]):
-            logger.info("%s has already been tweeted for feed %s" %
+            logger.debug("%s has already been tweeted for feed %s" %
                         (identifier, post["feed_id"]))
             continue
         tweet_count += 1
