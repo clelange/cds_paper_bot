@@ -15,6 +15,7 @@ import maya
 import requests
 from wand.image import Image, Color
 import imageio
+import re
 
 
 BOT_HANDLE = "@CMS_results"
@@ -413,7 +414,7 @@ def main():
                             (identifier, post["feed_id"]))
         elif check_id_exists(identifier, post["feed_id"]):
             logger.debug("%s has already been tweeted for feed %s" %
-                        (identifier, post["feed_id"]))
+                         (identifier, post["feed_id"]))
             continue
         tweet_count += 1
         logger.info("{id} - published: {date}".format(id=identifier,
@@ -431,7 +432,7 @@ def main():
             if "files/arXiv:" in media_url:
                 arxiv_id = media_url.rsplit("files/", 1)[1].strip(".pdf")
             # consider only attached Figures
-            if "/files/Figure_" not in media_url:
+            if not re.search("/files\/.*Figure_", media_url):
                 continue
             media_found = True
             media_url = media_url.split("?", 1)[0]
