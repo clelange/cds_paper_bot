@@ -221,7 +221,8 @@ def upload_images(twitter, image_list, post_gif):
                 if image_path.endswith("gif"):
                     try:
                         # while media_category="tweet_gif" should be used, this breaks the gif...
-                        # response = twitter.upload_media(media=image, media_category="tweet_gif")
+                        # response = twitter.upload_media(media=image,
+                        # media_category="tweet_gif")
                         response = twitter.upload_media(media=image)
                     except TwythonError as twython_error:
                         print(twython_error)
@@ -452,9 +453,11 @@ def main():
                         request.raw.decode_content = True
                         shutil.copyfileobj(request.raw, file_handler)
                     downloaded_image_list.append(out_path)
-        image_list = process_images(
-            identifier, downloaded_image_list, post_gif)
-        image_ids = upload_images(twitter, image_list, post_gif)
+        image_ids = []
+        if downloaded_image_list:
+            image_list = process_images(
+                identifier, downloaded_image_list, post_gif)
+            image_ids = upload_images(twitter, image_list, post_gif)
 
         title = post.title
         link = post.link
@@ -475,13 +478,14 @@ def main():
                 # try to recover since something went wrong
                 # first, try to use individual images instead of GIF
                 if post_gif:
-                    logger.info("Trying to tweet without GIF")
-                    image_list = process_images(
-                        identifier, downloaded_image_list, post_gif=False)
-                    image_ids = upload_images(
-                        twitter, image_list, post_gif=False)
-                    tweet_response = tweet(
-                        twitter, identifier, title_formatted, link, image_ids, post_gif=False)
+                    if downloaded_image_list:
+                        logger.info("Trying to tweet without GIF")
+                        image_list = process_images(
+                            identifier, downloaded_image_list, post_gif=False)
+                        image_ids = upload_images(
+                            twitter, image_list, post_gif=False)
+                        tweet_response = tweet(
+                            twitter, identifier, title_formatted, link, image_ids, post_gif=False)
             if not tweet_response:
                 # second, try to tweet without image
                 logger.info("Trying to tweet without images")
