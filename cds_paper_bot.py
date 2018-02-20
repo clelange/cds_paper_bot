@@ -433,7 +433,7 @@ def main():
             if "files/arXiv:" in media_url:
                 arxiv_id = media_url.rsplit("files/", 1)[1].strip(".pdf")
             # consider only attached Figures
-            if not re.search("/files\/.*Figure_", media_url):
+            if not re.search(r"/files\/.*Figure_", media_url):
                 continue
             media_found = True
             media_url = media_url.split("?", 1)[0]
