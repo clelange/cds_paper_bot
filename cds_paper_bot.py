@@ -95,8 +95,10 @@ def process_images(identifier, downloaded_image_list, post_gif, use_wand=True, u
                     img.format = new_image_format
                     img.background_color = Color('white')
                     if (img.size[0] > MAX_IMG_DIM) or (img.size[1] > MAX_IMG_DIM):
-                        img.resize(int(img.size[0] * .5),
-                                   int(img.size[1] * .5))
+                        scale_factor = MAX_IMG_DIM / \
+                            float(max(img.size[0], img.size[1]))
+                        img.resize(int(img.size[0] * scale_factor),
+                                   int(img.size[1] * scale_factor))
                     img.compression_quality = 75
                     filename = image_file
                     img.alpha_channel = 'remove'
@@ -115,8 +117,10 @@ def process_images(identifier, downloaded_image_list, post_gif, use_wand=True, u
             if use_wand:
                 with Image(filename="{}[0]".format(image_file)) as img:
                     if (img.size[0] > MAX_IMG_DIM) or (img.size[1] > MAX_IMG_DIM):
-                        img.resize(int(img.size[0] * .5),
-                                   int(img.size[1] * .5))
+                        scale_factor = MAX_IMG_DIM / \
+                            float(max(img.size[0], img.size[1]))
+                        img.resize(int(img.size[0] * scale_factor),
+                                   int(img.size[1] * scale_factor))
                     for i, _ in enumerate(max_dim):
                         if img.size[i] > max_dim[i]:
                             max_dim[i] = img.size[i]
@@ -149,7 +153,9 @@ def process_images(identifier, downloaded_image_list, post_gif, use_wand=True, u
             command = "convert -quality 75% -trim"  # trim to get rid of whitespace
             with Image(filename="{}[0]".format(image_file)) as img:  # , resolution=300
                 if (img.size[0] > MAX_IMG_DIM) or (img.size[1] > MAX_IMG_DIM):
-                    command += " -resize 50%"
+                    scale_factor = 100 * MAX_IMG_DIM / \
+                        float(max(img.size[0], img.size[1]))
+                    command += " -resize {}%".format(int(scale_factor))
                 filename = image_file.replace(".pdf", ".%s" % new_image_format)
                 command += "%s %s" % (image_file, filename)
                 execute_command(command)
