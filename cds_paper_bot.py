@@ -14,6 +14,7 @@ from twython import Twython, TwythonError
 import maya
 import requests
 from wand.image import Image, Color
+from wand.exceptions import CorruptImageError
 import imageio
 import re
 
@@ -90,28 +91,32 @@ def process_images(identifier, downloaded_image_list, post_gif, use_wand=True, u
         if image_file.endswith('pdf'):
             if use_wand:
                 # , resolution=300
-                with Image(filename="{}[0]".format(image_file)) as img:
-                    # process pdfs here only, others seem to be far too big
-                    img.format = new_image_format
-                    img.background_color = Color('white')
-                    if (img.size[0] > MAX_IMG_DIM) or (img.size[1] > MAX_IMG_DIM):
-                        scale_factor = MAX_IMG_DIM / \
-                            float(max(img.size[0], img.size[1]))
-                        img.resize(int(img.size[0] * scale_factor),
-                                   int(img.size[1] * scale_factor))
-                    img.compression_quality = 75
-                    filename = image_file
-                    img.alpha_channel = 'remove'
-                    img.trim()
-                    filename = filename.replace(
-                        ".pdf", ".%s" % new_image_format)
-                    # save image in list
-                    image_list.append(filename)
-                    img.save(filename=filename)
-                    # need to save max dimensions for gif canvas
-                    for i, _ in enumerate(max_dim):
-                        if img.size[i] > max_dim[i]:
-                            max_dim[i] = img.size[i]
+                try:
+                    with Image(filename="{}[0]".format(image_file)) as img:
+                        # process pdfs here only, others seem to be far too big
+                        img.format = new_image_format
+                        img.background_color = Color('white')
+                        if (img.size[0] > MAX_IMG_DIM) or (img.size[1] > MAX_IMG_DIM):
+                            scale_factor = MAX_IMG_DIM / \
+                                float(max(img.size[0], img.size[1]))
+                            img.resize(int(img.size[0] * scale_factor),
+                                       int(img.size[1] * scale_factor))
+                        img.compression_quality = 75
+                        filename = image_file
+                        img.alpha_channel = 'remove'
+                        img.trim()
+                        filename = filename.replace(
+                            ".pdf", ".%s" % new_image_format)
+                        # save image in list
+                        image_list.append(filename)
+                        img.save(filename=filename)
+                        # need to save max dimensions for gif canvas
+                        for i, _ in enumerate(max_dim):
+                            if img.size[i] > max_dim[i]:
+                                max_dim[i] = img.size[i]
+                except CorruptImageError as e:
+                    print(e)
+                    print("Ignoring", image_file)
     if max(max_dim[0], max_dim[1]) == 0:
         for image_file in downloaded_image_list:
             if use_wand:
