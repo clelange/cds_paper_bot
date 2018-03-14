@@ -1,5 +1,5 @@
 # ignore authentication file
-auth.py
+auth.ini
 .DS_Store
 # Byte-compiled / optimized / DLL files
 __pycache__/
