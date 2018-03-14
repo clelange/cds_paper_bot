@@ -418,7 +418,6 @@ def main():
     auth_file = args.auth
 
     config = load_config(experiment, feed_file, auth_file)
-    print(config)
 
     feed_entries = []
     for key in config['FEED_DICT']:
