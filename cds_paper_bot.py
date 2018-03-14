@@ -72,7 +72,7 @@ def execute_command(command):
 
 def process_images(identifier, downloaded_image_list, post_gif, use_wand=True, use_imageio=True):
     """Convert/resize all images to png."""
-    logger.info("Processing images.")
+    logger.info("Processing %d images." % len(downloaded_image_list))
     logger.debug("process_images(): identifier = {}, downloaded_image_list = {},\
                   use_wand = {}, use_imageio = {}".format(
         identifier, downloaded_image_list, use_wand, use_imageio))
@@ -468,9 +468,17 @@ def main():
             # try to find arXiv ID
             if "files/arXiv:" in media_url:
                 arxiv_id = media_url.rsplit("files/", 1)[1].strip(".pdf")
-            # consider only attached Figures
-            if not re.search(r"/files\/.*Figure_", media_url):
                 continue
+            # consider only attached Figures
+            if experiment == "CMS":
+                # CMS follows a certain standard
+                # but figures can be both PDF and PNG
+                if not re.search(r"/files\/.*[Ff]igures?_", media_url):
+                    continue
+            elif experiment == "ATLAS":
+                # ATLAS seems to only use PNG format for plots
+                if not media_url.lower().endswith(".png"):
+                    continue
             media_found = True
             media_url = media_url.split("?", 1)[0]
             logger.debug("media: " + media_url)
