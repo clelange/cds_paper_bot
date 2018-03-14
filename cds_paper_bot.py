@@ -17,14 +17,9 @@ from wand.image import Image, Color
 from wand.exceptions import CorruptImageError
 import imageio
 import re
+import configparser
 
 
-BOT_HANDLE = "@CMS_results"
-FEED_DICT = {}
-FEED_DICT[
-    'CMS_PAS_FEED'] = 'https://cds.cern.ch/rss?cc=CMS%20Physics%20Analysis%20Summaries'
-FEED_DICT[
-    'CMS_PAPER_FEED'] = 'https://cds.cern.ch/rss?cc=CMS%20Publication%20Drafts%20Final'
 # Maximum image dimension (both x and y)
 MAX_IMG_DIM = 1200
 # TODO: tag actual experiment?
@@ -198,26 +193,44 @@ def process_images(identifier, downloaded_image_list, post_gif, use_wand=True, u
     return image_list
 
 
-def twitter_auth():
+def twitter_auth(auth_dict):
     """Authenticate to twitter."""
-    from auth import (
-        CONSUMER_KEY,
-        CONSUMER_SECRET,
-        ACCESS_TOKEN,
-        ACCESS_TOKEN_SECRET
-    )
     try:
         twitter = Twython(
-            CONSUMER_KEY,
-            CONSUMER_SECRET,
-            ACCESS_TOKEN,
-            ACCESS_TOKEN_SECRET
+            auth_dict['CONSUMER_KEY'],
+            auth_dict['CONSUMER_SECRET'],
+            auth_dict['ACCESS_TOKEN'],
+            auth_dict['ACCESS_TOKEN_SECRET']
         )
     except TwythonError as twython_error:
         print(twython_error)
         logger.error(twitter)
         sys.exit(1)
     return twitter
+
+
+def load_config(experiment, feed_file, auth_file):
+    # load configs into dict
+    config_dict = {}
+    config = configparser.RawConfigParser()
+    # load the feed config
+    config.read(feed_file)
+    if experiment not in config.sections():
+        logger.error("Experiment {} not found in {}".format(
+            experiment, feed_file))
+    config_dict["FEED_DICT"] = {}
+    for key in config[experiment]:
+        config_dict["FEED_DICT"][key.upper()] = config[experiment][key]
+    # now load the secrets
+    config.clear()
+    config.read(auth_file)
+    if experiment not in config.sections():
+        logger.error("Experiment {} not found in {}".format(
+            experiment, auth_file))
+    config_dict["AUTH"] = {}
+    for key in config[experiment]:
+        config_dict["AUTH"][key.upper()] = config[experiment][key]
+    return config_dict
 
 
 def upload_images(twitter, image_list, post_gif):
@@ -254,7 +267,7 @@ def upload_images(twitter, image_list, post_gif):
     return image_ids
 
 
-def split_text(identifier, title, link, short_url_length, maxlength):
+def split_text(identifier, title, link, short_url_length, maxlength, bot_handle):
     """Split tweet into several including URL in first one"""
     logger.info("Splitting text.")
     message_list = []
@@ -280,12 +293,12 @@ def split_text(identifier, title, link, short_url_length, maxlength):
             message = "{} {}".format(message, link)
             first_message = False
         else:
-            message = BOT_HANDLE + " " + message
+            message = bot_handle + " " + message
         message_list.append(message)
     return message_list
 
 
-def tweet(twitter, identifier, title, link, image_ids, post_gif):
+def tweet(twitter, identifier, title, link, image_ids, post_gif, bot_handle):
     """tweet the new results with title and link and pictures taking care of length limitations."""
     logger.info("Creating tweet.")
     # https://dev.twitter.com/rest/reference/get/help/configuration
@@ -294,7 +307,8 @@ def tweet(twitter, identifier, title, link, image_ids, post_gif):
     short_url_length = len(link)
     maxlength = tweet_length - short_url_length
 
-    message_list = split_text(identifier, title, link, tweet_length, maxlength)
+    message_list = split_text(identifier, title, link,
+                              tweet_length, maxlength, bot_handle)
     first_message = True
     previous_status_id = None
     response = {}
@@ -379,6 +393,12 @@ def main():
                         action="store_true")
     parser.add_argument("-g", "--nogif", help="do not create GIF",
                         action="store_true")
+    parser.add_argument("-e", "--experiment", help="experiment to tweet for",
+                        type=str, default="CMS")
+    parser.add_argument("-c", "--config", help="name of feeds config file",
+                        type=str, default="feeds.ini")
+    parser.add_argument("--auth", help="name of auth config file",
+                        type=str, default="auth.ini")
     args = parser.parse_args()
     max_tweets = args.max
     if args.dry:
@@ -393,11 +413,17 @@ def main():
         analysis_id = args.analysis
         max_tweets = 1
         logger.info("Looking for analysis with ID %s" % (analysis_id))
+    experiment = args.experiment
+    feed_file = args.config
+    auth_file = args.auth
+
+    config = load_config(experiment, feed_file, auth_file)
+    print(config)
 
     feed_entries = []
-    for key in FEED_DICT:
+    for key in config['FEED_DICT']:
         logger.info("Getting feed for %s" % key)
-        this_feed = read_feed(FEED_DICT[key])
+        this_feed = read_feed(config['FEED_DICT'][key])
         this_feed_entries = this_feed["entries"]
         logger.info("Found %d items" % len(this_feed_entries))
         # add feed info to entries so that we can loop more easily later
@@ -411,7 +437,7 @@ def main():
             logger.info(" - {post_id} ({feed_id}), published {date}".format(
                 post_id=post["dc_source"], feed_id=post["feed_id"], date=post["published"]))
         return
-    twitter = twitter_auth()
+    twitter = twitter_auth(config['AUTH'])
     # loop over posts sorted by date
     tweet_count = 0
     for post in sorted(feed_entries, key=lambda x: maya.parse(x["published"]).datetime()):
@@ -484,7 +510,7 @@ def main():
         logger.info("{}: {} {}".format(identifier, title_formatted, link))
         if not dry_run:
             tweet_response = tweet(twitter, identifier,
-                                   title_formatted, link, image_ids, post_gif)
+                                   title_formatted, link, image_ids, post_gif, config['AUTH']['BOT_HANDLE'])
             if not tweet_response:
                 # try to recover since something went wrong
                 # first, try to use individual images instead of GIF
@@ -496,12 +522,12 @@ def main():
                         image_ids = upload_images(
                             twitter, image_list, post_gif=False)
                         tweet_response = tweet(
-                            twitter, identifier, title_formatted, link, image_ids, post_gif=False)
+                            twitter, identifier, title_formatted, link, image_ids, post_gif=False, bot_handle=config['AUTH']['BOT_HANDLE'])
             if not tweet_response:
                 # second, try to tweet without image
                 logger.info("Trying to tweet without images")
                 tweet_response = tweet(
-                    twitter, identifier, title_formatted, link, image_ids=[], post_gif=False)
+                    twitter, identifier, title_formatted, link, image_ids=[], post_gif=False, bot_handle=config['AUTH']['BOT_HANDLE'])
             if tweet_response:
                 store_id(identifier, post["feed_id"])
         if not keep_image_dir:
