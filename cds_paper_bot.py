@@ -180,10 +180,10 @@ def process_images(identifier, downloaded_image_list, post_gif, use_wand=True, u
                 images_for_gif.append(image_file)
         if use_imageio:
             imageio.mimsave('{id}/{id}.gif'.format(id=identifier), images_for_gif,
-                            format='GIF-FI', duration=2, quantizer='nq', palettesize=256)
+                            format='GIF-FI', duration=1.2, quantizer='nq', palettesize=256)
         else:
-            command = "convert -delay 200 -loop 0 "
-            # command = "gifsicle --delay=200 --loop "
+            command = "convert -delay 120 -loop 0 "
+            # command = "gifsicle --delay=120 --loop "
             command += " ".join(images_for_gif)
             command += ' {id}/{id}.gif'.format(id=identifier)
             # command += ' > {id}/{id}.gif'.format(id=identifier)
