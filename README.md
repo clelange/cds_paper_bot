@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/100429308.svg)](https://zenodo.org/badge/latestdoi/100429308)
+
 # CDS Paper Bot
 
 This is a Twitter bot written in python (version 3) that reads the RSS feeds of the [CERN Document Server (CDS)](https://cds.cern.ch/) and creates tweets of new publications.
