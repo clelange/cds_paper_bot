@@ -23,3 +23,15 @@ For information on running the bot, do
 ```
 python cds_paper_bot.py --help
 ```
+
+## Docker image
+
+If you would like to run the bot in an isolated environment, e.g. on a Raspberry Pi, you can try to use the [Dockerfile](Dockerfile).
+Build the container using:
+```
+docker build -t cds_paper_bot .
+```
+Then run it from the repository directory:
+```
+docker run --rm -ti -v "$(pwd)":/home/app -w /home/app cds_paper_bot python cds_paper_bot.py
+```
