@@ -412,7 +412,7 @@ def main():
     if args.analysis:
         analysis_id = args.analysis
         max_tweets = 1
-        logger.info("Looking for analysis with ID %s" % (analysis_id))
+        logger.info("Looking for analysis with ID %s" % analysis_id)
     experiment = args.experiment
     feed_file = args.config
     auth_file = args.auth
