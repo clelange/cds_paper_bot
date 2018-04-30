@@ -51,6 +51,13 @@ def format_title(title):
         logger.error(identifier)
         text_title = title
     logger.debug(text_title)
+    # insert spaces before and after the following characters
+    char_with_spaces = ["=", "→"]
+    for my_char in char_with_spaces:
+        pat = re.compile(r"\s?%s\s?" % my_char)
+        text_title= re.sub(pat, " %s " % my_char, text_title)
+    # reduce all spaces to a maximum of one
+    text_title = re.sub(r"\s+", " ", text_title)
     return text_title
 
 
