@@ -105,12 +105,12 @@ def process_images(identifier, downloaded_image_list, post_gif, use_wand=True, u
                     img.alpha_channel = 'remove'
                     img.trim(fuzz=0.01)
                     img.reset_coords()  # equivalent of repage
-                    if image_file.endswith('pdf'):
-                        filename = filename.replace(
-                            ".pdf", ".%s" % new_image_format)
                     # give the file a different name
                     filesplit = image_file.rsplit(".", 1)
                     filename = filesplit[0] + "_." + filesplit[1]
+                    if filename.endswith('pdf'):
+                        filename = filename.replace(
+                            ".pdf", ".%s" % new_image_format)
                     # save image in list
                     image_list.append(filename)
                     img.save(filename=filename)
@@ -195,9 +195,10 @@ def process_images(identifier, downloaded_image_list, post_gif, use_wand=True, u
                 image_file = image_file.replace(
                     '.%s' % new_image_format, '.gif')
                 # foreground.transform(resize="{0}x{1}".format(*max_dim))
-                with Image(width=max_dim[0], height=max_dim[1], background=Color('white')) as out:
-                    left = int((max_dim[0] - foreground.size[0]) / 2)
-                    top = int((max_dim[1] - foreground.size[1]) / 2)
+                add_margin = 1.03
+                with Image(width=int(max_dim[0]*add_margin), height=int(max_dim[1]*add_margin), background=Color('white')) as out:
+                    left = int((max_dim[0]*add_margin - foreground.size[0]) / 2)
+                    top = int((max_dim[1]*add_margin - foreground.size[1]) / 2)
                     out.composite(foreground, left=left, top=top)
                     out.save(filename=image_file)
             if use_imageio:
