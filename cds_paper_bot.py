@@ -87,85 +87,104 @@ def process_images(identifier, downloaded_image_list, post_gif, use_wand=True, u
     images_for_gif = []
     max_dim = [0, 0]
     new_image_format = 'png'
+    # also calculate average dimensions to scale down very large images
+    dim_list_x = []
+    dim_list_y = []
 
     # first loop to find maximum PDF dimensions to have high quality images
     for image_file in downloaded_image_list:
-        if image_file.endswith('pdf'):
-            if use_wand:
-                # , resolution=300
-                try:
-                    with Image(filename="{}[0]".format(image_file)) as img:
-                        # process pdfs here only, others seem to be far too big
-                        img.format = new_image_format
-                        img.background_color = Color('white')
-                        if (img.size[0] > MAX_IMG_DIM) or (img.size[1] > MAX_IMG_DIM):
-                            scale_factor = MAX_IMG_DIM / \
-                                float(max(img.size[0], img.size[1]))
-                            img.resize(int(img.size[0] * scale_factor),
-                                       int(img.size[1] * scale_factor))
-                        img.compression_quality = 75
-                        filename = image_file
-                        img.alpha_channel = 'remove'
-                        img.trim()
-                        filename = filename.replace(
-                            ".pdf", ".%s" % new_image_format)
-                        # save image in list
-                        image_list.append(filename)
-                        img.save(filename=filename)
-                        # need to save max dimensions for gif canvas
-                        for i, _ in enumerate(max_dim):
-                            if img.size[i] > max_dim[i]:
-                                max_dim[i] = img.size[i]
-                except CorruptImageError as e:
-                    print(e)
-                    print("Ignoring", image_file)
-    if max(max_dim[0], max_dim[1]) == 0:
-        for image_file in downloaded_image_list:
-            if use_wand:
-                with Image(filename="{}[0]".format(image_file)) as img:
-                    if (img.size[0] > MAX_IMG_DIM) or (img.size[1] > MAX_IMG_DIM):
-                        scale_factor = MAX_IMG_DIM / \
-                            float(max(img.size[0], img.size[1]))
-                        img.resize(int(img.size[0] * scale_factor),
-                                   int(img.size[1] * scale_factor))
-                    for i, _ in enumerate(max_dim):
-                        if img.size[i] > max_dim[i]:
-                            max_dim[i] = img.size[i]
-
-    for image_file in downloaded_image_list:
         if use_wand:
-            # already processed non-PDF files with wand
-            if not image_file.endswith('pdf'):
+            # , resolution=300
+            try:
                 with Image(filename="{}[0]".format(image_file)) as img:
+                    # process pdfs here only, others seem to be far too big
                     img.format = new_image_format
                     img.background_color = Color('white')
                     img.compression_quality = 75
-                    # resize to maximally the size of the converted PDFs
-                    logger.debug("img.size[0] = {}, img.size[1] = {}".format(img.size[0],
-                                                                             img.size[1]))
-                    side_to_scale = max(img.size[0], img.size[1])
-                    scale_factor = max(max_dim[0], max_dim[
-                                       1]) / float(side_to_scale)
-                    if scale_factor < 1:
-                        img.resize(
-                            int(img.size[0] * scale_factor), int(img.size[1] * scale_factor))
+                    filename = image_file
+                    img.alpha_channel = 'remove'
+                    img.trim(fuzz=0.01)
+                    img.reset_coords()  # equivalent of repage
+                    if image_file.endswith('pdf'):
+                        filename = filename.replace(
+                            ".pdf", ".%s" % new_image_format)
                     # give the file a different name
                     filesplit = image_file.rsplit(".", 1)
                     filename = filesplit[0] + "_." + filesplit[1]
                     # save image in list
                     image_list.append(filename)
                     img.save(filename=filename)
-        else:
-            # if using convert, no special treatment at the moment
-            command = "convert -quality 75% -trim"  # trim to get rid of whitespace
-            with Image(filename="{}[0]".format(image_file)) as img:  # , resolution=300
-                if (img.size[0] > MAX_IMG_DIM) or (img.size[1] > MAX_IMG_DIM):
-                    scale_factor = 100 * MAX_IMG_DIM / \
+                    dim_list_x.append(img.size[0])
+                    dim_list_y.append(img.size[1])
+                    # need to save max dimensions for gif canvas
+                    for i, _ in enumerate(max_dim):
+                        if img.size[i] > max_dim[i]:
+                            max_dim[i] = img.size[i]
+            except CorruptImageError as corrupt_except:
+                print(corrupt_except)
+                print("Ignoring", image_file)
+    # rescale images
+    average_dims = (float(sum(dim_list_x))/max(len(dim_list_x),1),
+                    float(sum(dim_list_y))/max(len(dim_list_y),1))
+    dim_xy = int(max(min(MAX_IMG_DIM, average_dims[0]), min(MAX_IMG_DIM, average_dims[0])))
+
+    # print(max_dim[0], max_dim[1], dim_xy, MAX_IMG_DIM)
+    # reset max_dim again
+    max_dim = [0, 0]
+    # scale individual images
+    for image_file in image_list:
+        if use_wand:
+            filename=image_file
+            with Image(filename=filename) as img:
+                # print(filename, img.size[0], img.size[1])
+                if (img.size[0] > dim_xy) or (img.size[1] > dim_xy):
+                    scale_factor = dim_xy / \
                         float(max(img.size[0], img.size[1]))
-                    command += " -resize {}%".format(int(scale_factor))
-                filename = image_file.replace(".pdf", ".%s" % new_image_format)
-                command += "%s %s" % (image_file, filename)
-                execute_command(command)
+                    img.resize(int(img.size[0] * scale_factor),
+                                int(img.size[1] * scale_factor))
+                for i, _ in enumerate(max_dim):
+                    if img.size[i] > max_dim[i]:
+                        max_dim[i] = img.size[i]
+                img.save(filename=filename)
+
+    # for image_file in downloaded_image_list:
+    #     if use_wand:
+    #         # already processed non-PDF files with wand
+    #         if not image_file.endswith('pdf'):
+    #             with Image(filename="{}[0]".format(image_file)) as img:
+    #                 img.format = new_image_format
+    #                 img.background_color = Color('white')
+    #                 img.compression_quality = 75
+    #                 img.alpha_channel = 'remove'
+    #                 img.trim(fuzz=0.01)
+    #                 img.reset_coords()  # same as repage
+    #                 # resize to maximally the size of the converted PDFs
+    #                 logger.debug("img.size[0] = {}, img.size[1] = {}".format(img.size[0],
+    #                                                                          img.size[1]))
+    #                 side_to_scale = max(img.size[0], img.size[1])
+    #                 scale_factor = max(max_dim[0], max_dim[
+    #                                    1]) / float(side_to_scale)
+    #                 if scale_factor < 1:
+    #                     img.resize(
+    #                         int(img.size[0] * scale_factor), int(img.size[1] * scale_factor))
+    #                 # give the file a different name
+    #                 filesplit = image_file.rsplit(".", 1)
+    #                 filename = filesplit[0] + "_." + filesplit[1]
+    #                 # save image in list
+    #                 image_list.append(filename)
+    #                 img.save(filename=filename)
+    #     else:
+    #         # if using convert, no special treatment at the moment
+    #         command = "convert -quality 75% -trim"  # trim to get rid of whitespace
+    #         with Image(filename="{}[0]".format(image_file)) as img:  # , resolution=300
+    #             if (img.size[0] > MAX_IMG_DIM) or (img.size[1] > MAX_IMG_DIM):
+    #                 scale_factor = 100 * MAX_IMG_DIM / \
+    #                     float(max(img.size[0], img.size[1]))
+    #                 command += " -resize {}%".format(int(scale_factor))
+    #             filename = image_file.replace(".pdf", ".%s" % new_image_format)
+    #             command += "%s %s" % (image_file, filename)
+    #             execute_command(command)
+
     # bring list in order again
     image_list = sorted(image_list)
     if post_gif:
