@@ -22,6 +22,7 @@ import configparser
 
 # Maximum image dimension (both x and y)
 MAX_IMG_DIM = 1200
+MAX_IMG_SIZE = 5242880
 # TODO: tag actual experiment?
 # TODO: add some general tags?
 # TODO: Make certain keywords tags
@@ -205,17 +206,25 @@ def process_images(identifier, downloaded_image_list, post_gif, use_wand=True, u
                 images_for_gif.append(imageio.imread(image_file))
             else:
                 images_for_gif.append(image_file)
-        if use_imageio:
-            imageio.mimsave('{id}/{id}.gif'.format(id=identifier), images_for_gif,
-                            format='GIF-FI', duration=1.2, quantizer='nq', palettesize=256)
-        else:
-            command = "convert -delay 120 -loop 0 "
-            # command = "gifsicle --delay=120 --loop "
-            command += " ".join(images_for_gif)
-            command += ' {id}/{id}.gif'.format(id=identifier)
-            # command += ' > {id}/{id}.gif'.format(id=identifier)
-            execute_command(command)
-        # replace image list by GIF only
+        img_size = MAX_IMG_SIZE+1
+        # the gif can only have a certain size, so we loop until it's small enough
+        while img_size > MAX_IMG_SIZE:
+            if use_imageio:
+                imageio.mimsave('{id}/{id}.gif'.format(id=identifier), images_for_gif,
+                                format='GIF-FI', duration=1.2, quantizer='nq', palettesize=256)
+            else:
+                command = "convert -delay 120 -loop 0 "
+                # command = "gifsicle --delay=120 --loop "
+                command += " ".join(images_for_gif)
+                command += ' {id}/{id}.gif'.format(id=identifier)
+                # command += ' > {id}/{id}.gif'.format(id=identifier)
+                execute_command(command)
+            img_size = os.path.getsize('{id}/{id}.gif'.format(id=identifier))
+            if img_size > MAX_IMG_SIZE:
+                images_for_gif = images_for_gif[:-1]
+                logger.info("Image to big ({} bytes), dropping last figure, {} images in GIF".format(img_size, len(images_for_gif)))
+                # os.remove('{id}/{id}.gif'.format(id=identifier))
+            # replace image list by GIF only
         image_list = ['{id}/{id}.gif'.format(id=identifier)]
     return image_list
 
