@@ -56,7 +56,7 @@ def format_title(title):
     char_with_spaces = ["=", "→"]
     for my_char in char_with_spaces:
         pat = re.compile(r"\s?%s\s?" % my_char)
-        text_title= re.sub(pat, " %s " % my_char, text_title)
+        text_title = re.sub(pat, " %s " % my_char, text_title)
     # reduce all spaces to a maximum of one
     text_title = re.sub(r"\s+", " ", text_title)
     return text_title
@@ -125,9 +125,10 @@ def process_images(identifier, downloaded_image_list, post_gif, use_wand=True, u
                 print(corrupt_except)
                 print("Ignoring", image_file)
     # rescale images
-    average_dims = (float(sum(dim_list_x))/max(len(dim_list_x),1),
-                    float(sum(dim_list_y))/max(len(dim_list_y),1))
-    dim_xy = int(max(min(MAX_IMG_DIM, average_dims[0]), min(MAX_IMG_DIM, average_dims[0])))
+    average_dims = (float(sum(dim_list_x))/max(len(dim_list_x), 1),
+                    float(sum(dim_list_y))/max(len(dim_list_y), 1))
+    dim_xy = int(max(min(MAX_IMG_DIM, average_dims[0]), min(
+        MAX_IMG_DIM, average_dims[0])))
 
     # print(max_dim[0], max_dim[1], dim_xy, MAX_IMG_DIM)
     # reset max_dim again
@@ -135,14 +136,14 @@ def process_images(identifier, downloaded_image_list, post_gif, use_wand=True, u
     # scale individual images
     for image_file in image_list:
         if use_wand:
-            filename=image_file
+            filename = image_file
             with Image(filename=filename) as img:
                 # print(filename, img.size[0], img.size[1])
                 if (img.size[0] > dim_xy) or (img.size[1] > dim_xy):
                     scale_factor = dim_xy / \
                         float(max(img.size[0], img.size[1]))
                     img.resize(int(img.size[0] * scale_factor),
-                                int(img.size[1] * scale_factor))
+                               int(img.size[1] * scale_factor))
                 for i, _ in enumerate(max_dim):
                     if img.size[i] > max_dim[i]:
                         max_dim[i] = img.size[i]
@@ -198,7 +199,8 @@ def process_images(identifier, downloaded_image_list, post_gif, use_wand=True, u
                 # foreground.transform(resize="{0}x{1}".format(*max_dim))
                 add_margin = 1.03
                 with Image(width=int(max_dim[0]*add_margin), height=int(max_dim[1]*add_margin), background=Color('white')) as out:
-                    left = int((max_dim[0]*add_margin - foreground.size[0]) / 2)
+                    left = int(
+                        (max_dim[0]*add_margin - foreground.size[0]) / 2)
                     top = int((max_dim[1]*add_margin - foreground.size[1]) / 2)
                     out.composite(foreground, left=left, top=top)
                     out.save(filename=image_file)
@@ -222,7 +224,8 @@ def process_images(identifier, downloaded_image_list, post_gif, use_wand=True, u
             img_size = os.path.getsize('{id}/{id}.gif'.format(id=identifier))
             if img_size > MAX_IMG_SIZE:
                 images_for_gif = images_for_gif[:-1]
-                logger.info("Image to big ({} bytes), dropping last figure, {} images in GIF".format(img_size, len(images_for_gif)))
+                logger.info("Image to big ({} bytes), dropping last figure, {} images in GIF".format(
+                    img_size, len(images_for_gif)))
                 # os.remove('{id}/{id}.gif'.format(id=identifier))
             # replace image list by GIF only
         image_list = ['{id}/{id}.gif'.format(id=identifier)]
@@ -497,8 +500,9 @@ def main():
         arxiv_id = ""
         if "media_content" in post:
             media_content += post["media_content"]
-        if not os.path.exists(identifier):
-            os.makedirs(identifier)
+        outdir = identifier.replace(':', '_')
+        if not os.path.exists(outdir):
+            os.makedirs(outdir)
         for media in media_content:
             media_url = media["url"]
             # try to find arXiv ID
@@ -525,7 +529,7 @@ def main():
 
             if media_found:
                 # download images
-                out_path = "{}/{}".format(identifier,
+                out_path = "{}/{}".format(outdir,
                                           media_url.rsplit("/", 1)[1])
                 request = requests.get(media_url, stream=True)
                 if request.status_code == 200:
@@ -536,7 +540,7 @@ def main():
         image_ids = []
         if downloaded_image_list:
             image_list = process_images(
-                identifier, downloaded_image_list, post_gif)
+                outdir, downloaded_image_list, post_gif)
             image_ids = upload_images(twitter, image_list, post_gif)
 
         title = post.title
@@ -561,7 +565,7 @@ def main():
                     if downloaded_image_list:
                         logger.info("Trying to tweet without GIF")
                         image_list = process_images(
-                            identifier, downloaded_image_list, post_gif=False)
+                            outdir, downloaded_image_list, post_gif=False)
                         image_ids = upload_images(
                             twitter, image_list, post_gif=False)
                         tweet_response = tweet(
@@ -575,7 +579,7 @@ def main():
                 store_id(identifier, post["feed_id"])
         if not keep_image_dir:
             # clean up images
-            shutil.rmtree(identifier)
+            shutil.rmtree(outdir)
         if tweet_count >= max_tweets:
             return
 
