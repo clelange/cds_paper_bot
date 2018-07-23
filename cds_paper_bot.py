@@ -6,6 +6,8 @@ import argparse
 import shutil
 import logging
 import subprocess
+import re
+import configparser
 import daiquiri
 import feedparser
 from pylatexenc.latexwalker import LatexWalkerError
@@ -16,8 +18,6 @@ import requests
 from wand.image import Image, Color
 from wand.exceptions import CorruptImageError
 import imageio
-import re
-import configparser
 
 
 # Maximum image dimension (both x and y)
@@ -198,7 +198,8 @@ def process_images(identifier, downloaded_image_list, post_gif, use_wand=True, u
                     '.%s' % new_image_format, '.gif')
                 # foreground.transform(resize="{0}x{1}".format(*max_dim))
                 add_margin = 1.03
-                with Image(width=int(max_dim[0]*add_margin), height=int(max_dim[1]*add_margin), background=Color('white')) as out:
+                with Image(width=int(max_dim[0]*add_margin), height=int(max_dim[1]*add_margin),
+                           background=Color('white')) as out:
                     left = int(
                         (max_dim[0]*add_margin - foreground.size[0]) / 2)
                     top = int((max_dim[1]*add_margin - foreground.size[1]) / 2)
@@ -471,7 +472,8 @@ def main():
     if list_analyses:
         # sort by feed_id, then date
         logger.info("List of available analyses:")
-        for post in sorted(feed_entries, key=lambda x: (x["feed_id"], maya.parse(x["published"]).datetime())):
+        for post in sorted(feed_entries,
+                           key=lambda x: (x["feed_id"], maya.parse(x["published"]).datetime())):
             logger.info(" - {post_id} ({feed_id}), published {date}".format(
                 post_id=post["dc_source"], feed_id=post["feed_id"], date=post["published"]))
         return
@@ -536,6 +538,8 @@ def main():
                     with open(out_path, 'wb') as file_handler:
                         request.raw.decode_content = True
                         shutil.copyfileobj(request.raw, file_handler)
+                    if out_path.find("%") >= 0:
+                        continue
                     downloaded_image_list.append(out_path)
         image_ids = []
         if downloaded_image_list:
@@ -556,8 +560,8 @@ def main():
             title_formatted = title_formatted.encode('utf8')
         logger.info("{}: {} {}".format(identifier, title_formatted, link))
         if not dry_run:
-            tweet_response = tweet(twitter, identifier,
-                                   title_formatted, link, image_ids, post_gif, config['AUTH']['BOT_HANDLE'])
+            tweet_response = tweet(twitter, identifier, title_formatted, link,
+                                   image_ids, post_gif, config['AUTH']['BOT_HANDLE'])
             if not tweet_response:
                 # try to recover since something went wrong
                 # first, try to use individual images instead of GIF
@@ -569,12 +573,14 @@ def main():
                         image_ids = upload_images(
                             twitter, image_list, post_gif=False)
                         tweet_response = tweet(
-                            twitter, identifier, title_formatted, link, image_ids, post_gif=False, bot_handle=config['AUTH']['BOT_HANDLE'])
+                            twitter, identifier, title_formatted, link, image_ids, post_gif=False,
+                            bot_handle=config['AUTH']['BOT_HANDLE'])
             if not tweet_response:
                 # second, try to tweet without image
                 logger.info("Trying to tweet without images")
                 tweet_response = tweet(
-                    twitter, identifier, title_formatted, link, image_ids=[], post_gif=False, bot_handle=config['AUTH']['BOT_HANDLE'])
+                    twitter, identifier, title_formatted, link, image_ids=[],
+                    post_gif=False, bot_handle=config['AUTH']['BOT_HANDLE'])
             if tweet_response:
                 store_id(identifier, post["feed_id"])
         if not keep_image_dir:
