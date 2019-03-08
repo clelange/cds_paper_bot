@@ -463,6 +463,7 @@ def main():
     keep_image_dir = False
     list_analyses = False
     post_gif = True
+    use_arxiv_link = False
 
     # parse arguments
     parser = argparse.ArgumentParser()
@@ -484,6 +485,8 @@ def main():
                         type=str, default="feeds.ini")
     parser.add_argument("--auth", help="name of auth config file",
                         type=str, default="auth.ini")
+    parser.add_argument("--arXiv", help="use arXiv link",
+                        action="store_true")
     args = parser.parse_args()
     max_tweets = args.max
     if args.dry:
@@ -501,6 +504,7 @@ def main():
     experiment = args.experiment
     feed_file = args.config
     auth_file = args.auth
+    use_arxiv_link = args.arXiv
 
     config = load_config(experiment, feed_file, auth_file)
 
@@ -548,6 +552,10 @@ def main():
         # if post is already in the database, skip it
         media_content = []
         arxiv_id = ""
+        # try to find arXiv ID
+        if post["dc_source"].startswith("arXiv"):
+            arxiv_id = post["dc_source"].rsplit(":", 1)[1]
+            logger.info("Found arXiv:%s" % arxiv_id)
         if "media_content" in post:
             media_content += post["media_content"]
         outdir = identifier.replace(':', '_')
@@ -555,10 +563,6 @@ def main():
             os.makedirs(outdir)
         for media in media_content:
             media_url = media["url"]
-            # try to find arXiv ID
-            if "files/arXiv:" in media_url:
-                arxiv_id = media_url.rsplit("files/", 1)[1].strip(".pdf")
-                continue
             # consider only attached Figures
             if experiment == "CMS":
                 # CMS follows a certain standard
