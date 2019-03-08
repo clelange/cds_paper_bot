@@ -29,6 +29,7 @@ ENV PACKAGES="\
   freeimage \
   libpng \
   libjpeg \
+  libjpeg-turbo-dev \
   "
 
 COPY requirements.txt /tmp/requirements.txt
