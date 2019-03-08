@@ -31,6 +31,38 @@ MAX_IMG_SIZE = 5242880
 # resonances, DarkMatter, SUSY, BSM
 # Also: CMSB2G, CMSHIG, CMSEXO etc.
 # TopQuark, BottomQuark Quark/Quarks, Tau
+CADI_TO_HASHTAG = {}
+CADI_TO_HASHTAG['TOP'] = "#TopQuark"
+CADI_TO_HASHTAG['HIG'] = "#HiggsBoson"
+CADI_TO_HASHTAG['B2G'] = "#NewPhysics"
+CADI_TO_HASHTAG['EXO'] = "#NewPhysics"
+CADI_TO_HASHTAG['SUS'] = "#SuperSymmetry"
+CADI_TO_HASHTAG['FTR'] = "#Upgrade"
+CADI_TO_HASHTAG['SMP'] = "#StandardModel"
+CADI_TO_HASHTAG['BPH'] = "#BPhysics"
+
+# identifiers for preliminary results
+PRELIM = ["CMS-PAS", "ATLAS-CONF"]
+
+
+class Conference(object):
+    __slots__ = ['name', 'start', 'end']
+
+    def __init__(self, name, start, end):
+        self.name = name
+        self.start = start
+        self.end = end
+
+    def isNow(self, pub_date):
+        if self.start <= maya.parse(pub_date) <= self.end:
+            return f"#{self.name}{maya.now().year}"
+        return ""
+
+
+CONFERENCES = []
+CONFERENCES.append(Conference("Moriond", maya.parse(
+    f'{maya.now().year}-03-01'), maya.parse(f'{maya.now().year}-03-30')))
+
 
 daiquiri.setup(level=logging.INFO)
 logger = daiquiri.getLogger()
@@ -316,8 +348,8 @@ def upload_images(twitter, image_list, post_gif):
     return image_ids
 
 
-def split_text(identifier, title, link, short_url_length, maxlength, bot_handle):
-    """Split tweet into several including URL in first one"""
+def split_text(identifier, title, hashtags_link, short_url_length, maxlength, bot_handle):
+    """Split tweet into several including hashtags and URL in first one"""
     logger.info("Splitting text.")
     message_list = []
     remaining_text = "{}: {}".format(identifier, title)
@@ -339,7 +371,7 @@ def split_text(identifier, title, link, short_url_length, maxlength, bot_handle)
         else:
             remaining_text = ""
         if first_message:
-            message = "{} {}".format(message, link)
+            message = "{} {}".format(message, hashtags_link)
             first_message = False
         else:
             message = bot_handle + " " + message
@@ -347,16 +379,20 @@ def split_text(identifier, title, link, short_url_length, maxlength, bot_handle)
     return message_list
 
 
-def tweet(twitter, identifier, title, link, image_ids, post_gif, bot_handle):
+def tweet(twitter, identifier, title, link, conf_hashtags, image_ids, post_gif, bot_handle):
     """tweet the new results with title and link and pictures taking care of length limitations."""
     logger.info("Creating tweet.")
     # https://dev.twitter.com/rest/reference/get/help/configuration
     tweet_length = 280
     # twitter.get_twitter_configuration()['short_url_length']
     short_url_length = len(link)
+    hashtags_link = link
+    if conf_hashtags:
+        hashtags_link = f"{conf_hashtags} {link}"
+        short_url_length = len(hashtags_link)
     maxlength = tweet_length - short_url_length
 
-    message_list = split_text(identifier, title, link,
+    message_list = split_text(identifier, title, hashtags_link,
                               tweet_length, maxlength, bot_handle)
     first_message = True
     previous_status_id = None
@@ -470,14 +506,17 @@ def main():
 
     feed_entries = []
     for key in config['FEED_DICT']:
-        logger.info("Getting feed for %s" % key)
+        logger.info(f"Getting feed for {key}")
         this_feed = read_feed(config['FEED_DICT'][key])
-        this_feed_entries = this_feed["entries"]
-        logger.info("Found %d items" % len(this_feed_entries))
-        # add feed info to entries so that we can loop more easily later
-        for index, _ in enumerate(this_feed_entries):
-            this_feed_entries[index]["feed_id"] = key
-        feed_entries += this_feed_entries
+        if this_feed:
+            this_feed_entries = this_feed["entries"]
+            logger.info("Found %d items" % len(this_feed_entries))
+            # add feed info to entries so that we can loop more easily later
+            for index, _ in enumerate(this_feed_entries):
+                this_feed_entries[index]["feed_id"] = key
+            feed_entries += this_feed_entries
+        else:
+            logger.warning(f"Found no items for feed {key}")
     if list_analyses:
         # sort by feed_id, then date
         logger.info("List of available analyses:")
@@ -558,16 +597,29 @@ def main():
 
         title = post.title
         link = post.link
-        if arxiv_id:
-            arxiv_link = "https://arxiv.org/abs/%s" % arxiv_id.rsplit(":")[1]
-            logger.debug(arxiv_link)
-            request = requests.get(arxiv_link)
-            if request.status_code < 400:
-                link = arxiv_link
+        # if arxiv_id:
+        #     arxiv_link = "https://arxiv.org/abs/%s" % arxiv_id.rsplit(":")[1]
+        #     logger.debug(arxiv_link)
+        #     request = requests.get(arxiv_link)
+        #     if request.status_code < 400:
+        #         link = arxiv_link
+
+        prelim_result = False
+        for item in PRELIM:
+            if identifier.find(item) >= 0:
+                prelim_result = True
+                logger.info("This is a preliminary result.")
+        conf_hashtags = ""
+        # use only for PAS/CONF notes:
+        if prelim_result:
+            conf_hashtags = " ".join(conf.isNow(
+                post["published"]) for conf in CONFERENCES)
+            logger.info(f"Conference hashtags: {conf_hashtags}")
         title_formatted = format_title(title)
         if sys.version_info[0] < 3:
             title_formatted = title_formatted.encode('utf8')
-        logger.info("{}: {} {}".format(identifier, title_formatted, link))
+        logger.info("{}: {} {}".format(
+            identifier, title_formatted, " ".join([conf_hashtags, link])))
         if not dry_run:
             tweet_response = tweet(twitter, identifier, title_formatted, link,
                                    image_ids, post_gif, config['AUTH']['BOT_HANDLE'])
