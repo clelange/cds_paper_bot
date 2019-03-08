@@ -553,9 +553,15 @@ def main():
         media_content = []
         arxiv_id = ""
         # try to find arXiv ID
-        if post["dc_source"].startswith("arXiv"):
-            arxiv_id = post["dc_source"].rsplit(":", 1)[1]
+        if identifier.startswith("arXiv"):
+            arxiv_id = identifier.rsplit(":", 1)[1]
             logger.info("Found arXiv:%s" % arxiv_id)
+            arxiv_link = "https://arxiv.org/abs/%s" % arxiv_id
+            logger.debug(arxiv_link)
+            request = requests.get(arxiv_link)
+            if request.status_code >= 400:
+                logger.warning(f"arXiv URL {arxiv_link} seems invalid")
+                arxiv_link = None
         if "media_content" in post:
             media_content += post["media_content"]
         outdir = identifier.replace(':', '_')
@@ -601,12 +607,8 @@ def main():
 
         title = post.title
         link = post.link
-        # if arxiv_id:
-        #     arxiv_link = "https://arxiv.org/abs/%s" % arxiv_id.rsplit(":")[1]
-        #     logger.debug(arxiv_link)
-        #     request = requests.get(arxiv_link)
-        #     if request.status_code < 400:
-        #         link = arxiv_link
+        if use_arxiv_link and arxiv_id:
+            link = arxiv_link
 
         prelim_result = False
         for item in PRELIM:
