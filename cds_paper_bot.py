@@ -55,7 +55,8 @@ class Conference(object):
 
     def isNow(self, pub_date):
         if self.start <= maya.parse(pub_date) <= self.end:
-            return f"#{self.name}{maya.now().year}"
+            # return f"#{self.name}{maya.now().year}"
+            return f"#{self.name}"
         return ""
 
 
