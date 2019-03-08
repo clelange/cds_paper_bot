@@ -10,6 +10,7 @@ import re
 import configparser
 import daiquiri
 import feedparser
+from io import BytesIO
 from pylatexenc.latexwalker import LatexWalkerError
 from pylatexenc.latex2text import LatexNodes2Text
 from twython import Twython, TwythonError
@@ -38,7 +39,15 @@ logger = daiquiri.getLogger()
 
 def read_feed(rss_url):
     """read the RSS feed and return dictionary"""
-    feed = feedparser.parse(rss_url)
+    try:
+        response = requests.get(rss_url, timeout=10)
+    except requests.ReadTimeout:
+        logger.error("Timeout when reading RSS %s", rss_url)
+        return
+    # Turn stream into memory stream object for universal feedparser
+    content = BytesIO(response.content)
+    # Parse content
+    feed = feedparser.parse(content)
     return feed
 
 
@@ -524,7 +533,7 @@ def main():
             media_found = True
             media_url = media_url.split("?", 1)[0]
             logger.debug("media: " + media_url)
-            request = requests.get(media_url)
+            request = requests.get(media_url, timeout=10)
             if not request.status_code < 400:
                 logger.error("media: " + media_url + " does not exist!")
                 media_found = False
