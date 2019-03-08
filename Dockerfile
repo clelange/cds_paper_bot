@@ -13,6 +13,7 @@ ENV MAGICK_HOME=/usr
 #   * freeimage: taken from test repository
 ENV PACKAGES="\
   zlib \
+  zlib-dev \
   musl \
   musl-dev \
   libgcc \
