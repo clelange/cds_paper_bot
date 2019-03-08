@@ -627,7 +627,7 @@ def main():
         logger.info("{}: {} {}".format(
             identifier, title_formatted, " ".join(filter(None, [conf_hashtags, link]))))
         if not dry_run:
-            tweet_response = tweet(twitter, identifier, title_formatted, link,
+            tweet_response = tweet(twitter, identifier, title_formatted, link, conf_hashtags,
                                    image_ids, post_gif, config['AUTH']['BOT_HANDLE'])
             if not tweet_response:
                 # try to recover since something went wrong
@@ -640,13 +640,13 @@ def main():
                         image_ids = upload_images(
                             twitter, image_list, post_gif=False)
                         tweet_response = tweet(
-                            twitter, identifier, title_formatted, link, image_ids, post_gif=False,
+                            twitter, identifier, title_formatted, link, conf_hashtags, image_ids, post_gif=False,
                             bot_handle=config['AUTH']['BOT_HANDLE'])
             if not tweet_response:
                 # second, try to tweet without image
                 logger.info("Trying to tweet without images")
                 tweet_response = tweet(
-                    twitter, identifier, title_formatted, link, image_ids=[],
+                    twitter, identifier, title_formatted, link, conf_hashtags, image_ids=[],
                     post_gif=False, bot_handle=config['AUTH']['BOT_HANDLE'])
             if tweet_response:
                 store_id(identifier, post["feed_id"])
