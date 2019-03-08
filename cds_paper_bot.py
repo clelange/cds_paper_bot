@@ -555,7 +555,7 @@ def main():
         # try to find arXiv ID
         if identifier.startswith("arXiv"):
             arxiv_id = identifier.rsplit(":", 1)[1]
-            logger.info("Found arXiv:%s" % arxiv_id)
+            logger.info("Found arXiv ID arXiv:%s" % arxiv_id)
             arxiv_link = "https://arxiv.org/abs/%s" % arxiv_id
             logger.debug(arxiv_link)
             request = requests.get(arxiv_link)
