@@ -616,14 +616,14 @@ def main():
         conf_hashtags = ""
         # use only for PAS/CONF notes:
         if prelim_result:
-            conf_hashtags = " ".join(conf.isNow(
-                post["published"]) for conf in CONFERENCES)
+            conf_hashtags = " ".join(filter(None, (conf.isNow(
+                post["published"]) for conf in CONFERENCES)))
             logger.info(f"Conference hashtags: {conf_hashtags}")
         title_formatted = format_title(title)
         if sys.version_info[0] < 3:
             title_formatted = title_formatted.encode('utf8')
         logger.info("{}: {} {}".format(
-            identifier, title_formatted, " ".join([conf_hashtags, link])))
+            identifier, title_formatted, " ".join(filter(None, [conf_hashtags, link]))))
         if not dry_run:
             tweet_response = tweet(twitter, identifier, title_formatted, link,
                                    image_ids, post_gif, config['AUTH']['BOT_HANDLE'])
