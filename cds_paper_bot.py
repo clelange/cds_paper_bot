@@ -166,6 +166,8 @@ def process_images(identifier, downloaded_image_list, post_gif, use_wand=True, u
             except CorruptImageError as corrupt_except:
                 print(corrupt_except)
                 print("Ignoring", image_file)
+            except Exception as e:
+                print(e)
     # rescale images
     average_dims = (float(sum(dim_list_x))/max(len(dim_list_x), 1),
                     float(sum(dim_list_y))/max(len(dim_list_y), 1))
@@ -568,6 +570,7 @@ def main():
         outdir = identifier.replace(':', '_')
         if not os.path.exists(outdir):
             os.makedirs(outdir)
+        logger.debug("Attempting to download media.")
         for media in media_content:
             media_url = media["url"]
             # consider only attached Figures
