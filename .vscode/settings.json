@@ -1,4 +1,5 @@
 {
     "python.pythonPath": "/Users/clange/.ve/CDSPaperBot/bin/python",
-    "editor.formatOnSave": true
+    "editor.formatOnSave": true,
+    "python.linting.enabled": true
 }
