@@ -22,8 +22,8 @@ ENV PACKAGES="\
   python3 \
   python3-dev \
   bash \
-  imagemagick \
-  imagemagick-dev \
+  imagemagick6 \
+  imagemagick6-dev \
   py3-pillow \
   gcc \
   freeimage \

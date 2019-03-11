@@ -1,5 +1,12 @@
 {
     "python.pythonPath": "/Users/clange/.ve/CDSPaperBot/bin/python",
     "editor.formatOnSave": true,
-    "python.linting.enabled": true
+    "python.linting.enabled": true,
+    "workbench.colorCustomizations": {
+        "titleBar.activeBackground": "#42b883",
+        "titleBar.inactiveBackground": "#42b88399",
+        "titleBar.activeForeground": "#15202b",
+        "titleBar.inactiveForeground": "#15202b99"
+    },
+    "python.linting.pylintEnabled": true
 }
