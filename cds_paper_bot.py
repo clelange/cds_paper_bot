@@ -8,16 +8,16 @@ import logging
 import subprocess
 import re
 import configparser
+from io import BytesIO
 import daiquiri
 import feedparser
-from io import BytesIO
 from pylatexenc.latexwalker import LatexWalkerError
 from pylatexenc.latex2text import LatexNodes2Text
 from twython import Twython, TwythonError
 import maya
 import requests
 from wand.image import Image, Color
-from wand.exceptions import CorruptImageError
+from wand.exceptions import CorruptImageError  # pylint: disable=no-name-in-module
 import imageio
 
 
@@ -46,14 +46,17 @@ PRELIM = ["CMS-PAS", "ATLAS-CONF"]
 
 
 class Conference(object):
+    """Define conference class for hashtag implementation."""
     __slots__ = ['name', 'start', 'end']
 
     def __init__(self, name, start, end):
+        """Initialise with conf name, start and end dates."""
         self.name = name
         self.start = start
         self.end = end
 
-    def isNow(self, pub_date):
+    def is_now(self, pub_date):
+        """Return conference name if publication date is within date range."""
         if self.start <= maya.parse(pub_date) <= self.end:
             # return f"#{self.name}{maya.now().year}"
             return f"#{self.name}"
@@ -62,11 +65,11 @@ class Conference(object):
 
 CONFERENCES = []
 CONFERENCES.append(Conference("Moriond", maya.parse(
-    f'{maya.now().year}-03-01'), maya.parse(f'{maya.now().year}-03-30')))
+    f'{maya.now().year}-03-09'), maya.parse(f'{maya.now().year}-04-05')))
 
 
 daiquiri.setup(level=logging.INFO)
-logger = daiquiri.getLogger()
+logger = daiquiri.getLogger()  # pylint: disable=invalid-name
 # imageio.plugins.freeimage.download()
 
 
@@ -125,7 +128,7 @@ def process_images(identifier, downloaded_image_list, post_gif, use_wand=True, u
     logger.info("Processing %d images." % len(downloaded_image_list))
     logger.debug("process_images(): identifier = {}, downloaded_image_list = {},\
                   use_wand = {}, use_imageio = {}".format(
-        identifier, downloaded_image_list, use_wand, use_imageio))
+                      identifier, downloaded_image_list, use_wand, use_imageio))
     image_list = []
     images_for_gif = []
     max_dim = [0, 0]
@@ -166,8 +169,8 @@ def process_images(identifier, downloaded_image_list, post_gif, use_wand=True, u
             except CorruptImageError as corrupt_except:
                 print(corrupt_except)
                 print("Ignoring", image_file)
-            except Exception as e:
-                print(e)
+            except Exception as general_exception:  # pylint: disable=broad-except
+                print(general_exception)
     # rescale images
     average_dims = (float(sum(dim_list_x))/max(len(dim_list_x), 1),
                     float(sum(dim_list_y))/max(len(dim_list_y), 1))
@@ -294,7 +297,7 @@ def twitter_auth(auth_dict):
 
 
 def load_config(experiment, feed_file, auth_file):
-    # load configs into dict
+    """Load configs into dict."""
     config_dict = {}
     config = configparser.RawConfigParser()
     # load the feed config
@@ -622,7 +625,7 @@ def main():
         conf_hashtags = ""
         # use only for PAS/CONF notes:
         if prelim_result:
-            conf_hashtags = " ".join(filter(None, (conf.isNow(
+            conf_hashtags = " ".join(filter(None, (conf.is_now(
                 post["published"]) for conf in CONFERENCES)))
             logger.info(f"Conference hashtags: {conf_hashtags}")
         title_formatted = format_title(title)
@@ -644,8 +647,8 @@ def main():
                         image_ids = upload_images(
                             twitter, image_list, post_gif=False)
                         tweet_response = tweet(
-                            twitter, identifier, title_formatted, link, conf_hashtags, image_ids, post_gif=False,
-                            bot_handle=config['AUTH']['BOT_HANDLE'])
+                            twitter, identifier, title_formatted, link, conf_hashtags, image_ids,
+                            post_gif=False, bot_handle=config['AUTH']['BOT_HANDLE'])
             if not tweet_response:
                 # second, try to tweet without image
                 logger.info("Trying to tweet without images")

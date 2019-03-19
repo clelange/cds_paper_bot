@@ -1,0 +1,24 @@
+job:on-schedule:
+  only:
+    - schedules
+    - web
+  tags:
+    - docker-privileged
+    - docker-machine
+  image: docker:latest
+  before_script:
+    - ls -lisa
+    - ./.gitlab/before_script.sh
+  script:
+    - ./.gitlab/script.sh
+
+build_docker:
+  only:
+    changes:
+      - Dockerfile
+  tags:
+    - docker-image-build
+  script: "echo 'Building docker image..." # unused but this line is required by GitLab CI
+  variables:
+    TO: $CI_REGISTRY_IMAGE # $CI_REGISTRY_IMAGE is the registry space for this particular repository
+    # TO can be omitted and the imaged will be push to $CI_REGISTRY_IMAGE:latest

@@ -15,6 +15,7 @@ ENV PACKAGES="\
   libjpeg-dev \
   libfreeimage-dev \
   ghostscript \
+  git \
   "
 
 COPY requirements.txt /tmp/requirements.txt
