@@ -19,7 +19,7 @@ eval "$(ssh-agent -s)"
 set -x
 ssh-add <(echo "$GIT_SSH_PRIV_KEY")
 echo "$GIT_SSH_PRIV_KEY" > ~/.ssh/id_rsa
-set+x
+set +x
 chmod 600 ~/.ssh/id_rsa
 ssh-keyscan -p 7999 gitlab.cern.ch > ~/.ssh/known_hosts
 set -x

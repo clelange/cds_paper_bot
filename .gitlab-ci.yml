@@ -11,8 +11,7 @@ job:on-schedule:
 
 build_docker:
   only:
-    changes:
-      - Dockerfile
+    - web
   tags:
     - docker-image-build
   script: "echo 'Building docker image..." # unused but this line is required by GitLab CI
