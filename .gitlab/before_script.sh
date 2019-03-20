@@ -15,11 +15,9 @@ EOF
 # Create the SSH directory and give it the right permissions
 mkdir -p ~/.ssh
 chmod 700 ~/.ssh
-# eval "$(ssh-agent -s)"
-# ssh-add <(echo "$GIT_SSH_PRIV_KEY")
+eval "$(ssh-agent -s)"
+ssh-add <(echo "$GIT_SSH_PRIV_KEY")
 ssh-keyscan gitlab.cern.ch > ~/.ssh/known_hosts
-set +x
-echo "${SVNPASS}" | kinit "${SVNUSER}@CERN.CH" > /dev/null
 set -x
 # # Set git user name and email
 git config --global user.email "${GITMAIL}"
