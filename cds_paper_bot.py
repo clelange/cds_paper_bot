@@ -92,6 +92,8 @@ def format_title(title):
     logger.info("Formatting title.")
     logger.info(title)
     title = title.replace("\sqrt s", "\sqrt{s}")
+    if re.search(r"rightarrow\S", title):
+        title = title.replace("rightarrow", "rightarrow ")
     try:
         text_title = LatexNodes2Text().latex_to_text(title)
     except LatexWalkerError as identifier:
