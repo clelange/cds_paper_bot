@@ -107,6 +107,8 @@ def format_title(title):
         text_title = re.sub(pat, " %s " % my_char, text_title)
     # reduce all spaces to a maximum of one
     text_title = re.sub(r"\s+", " ", text_title)
+    # reduce all underscores to a maximum of one
+    text_title = re.sub(r"_+", "_", text_title)
     return text_title
 
 
