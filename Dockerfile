@@ -16,6 +16,7 @@ ENV PACKAGES="\
   libfreeimage-dev \
   ghostscript \
   git \
+  openssh-client \
   "
 
 COPY requirements.txt /tmp/requirements.txt
