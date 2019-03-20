@@ -5,8 +5,10 @@ set -e
 set -x
 python cds_paper_bot.py --dry -e "${EXPERIMENT}"
 if git status --porcelain; then
+    git checkout master
     git add ./*_FEED.txt
     git commit -m "update tweeted analyses"
+    git remote set-url origin "${REMOTE_GIT_REPO}"
     git push origin HEAD
 else
     echo "No changes found."
