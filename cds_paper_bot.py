@@ -543,6 +543,12 @@ def main():
         downloaded_image_list = []
         logger.debug(post)
         identifier = post["dc_source"]
+        # fix wrong PAS name:
+        parse_result = re.match(r"(CMS-PAS-).{3}-([A-Z]{3}-\d{2}-\d{3})-.*", identifier)
+        if parse_result:
+            new_identifier = parse_result.group(1)+parse_result.group(2)
+            logger.info(f"Replacing ID {identifier} by {new_identifier}")
+            identifier = new_identifier
         if analysis_id:
             if analysis_id not in identifier:
                 continue
