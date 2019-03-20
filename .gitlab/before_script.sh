@@ -17,6 +17,7 @@ mkdir -p ~/.ssh
 chmod 700 ~/.ssh
 eval "$(ssh-agent -s)"
 ssh-add <(echo "$GIT_SSH_PRIV_KEY")
+echo "$GIT_SSH_PRIV_KEY" > ~/.ssh/id_cern
 ssh-keyscan gitlab.cern.ch > ~/.ssh/known_hosts
 set -x
 # # Set git user name and email
