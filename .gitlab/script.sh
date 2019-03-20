@@ -3,7 +3,7 @@
 set -e
 # echo on
 set -x
-docker run --rm -v "$(pwd)":/home/app -w /home/app clelange/cds_paper_bot python cds_paper_bot.py --dry -e "${EXPERIMENT}"
+python cds_paper_bot.py --dry -e "${EXPERIMENT}"
 if git status --porcelain; then
     git add ./*_FEED.txt
     git commit -m "update tweeted analyses"

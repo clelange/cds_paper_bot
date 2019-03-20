@@ -2,10 +2,7 @@ job:on-schedule:
   only:
     - schedules
     - web
-  tags:
-    - docker-privileged
-    - docker-machine
-  image: docker:latest
+  image: $CI_REGISTRY_IMAGE
   before_script:
     - ls -lisa
     - ./.gitlab/before_script.sh
