@@ -8,5 +8,6 @@
         "titleBar.activeForeground": "#15202b",
         "titleBar.inactiveForeground": "#15202b99"
     },
-    "python.linting.pylintEnabled": true
+    "python.linting.pylintEnabled": true,
+    "python.formatting.provider": "black"
 }
