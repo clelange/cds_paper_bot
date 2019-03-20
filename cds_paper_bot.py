@@ -91,6 +91,7 @@ def format_title(title):
     """format the publication title"""
     logger.info("Formatting title.")
     logger.info(title)
+    title = title.replace("\sqrt s", "\sqrt{s}")
     try:
         text_title = LatexNodes2Text().latex_to_text(title)
     except LatexWalkerError as identifier:
