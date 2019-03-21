@@ -4,7 +4,7 @@ set -e
 # echo on
 set -x
 python cds_paper_bot.py -m 1 -e "${EXPERIMENT}"
-if git status --porcelain; then
+if [[ -n $(git status -s) ]]; then
     git checkout master
     git add ./*_FEED.txt
     git commit -m "update tweeted analyses"
