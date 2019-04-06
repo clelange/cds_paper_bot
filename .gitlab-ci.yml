@@ -1,8 +1,10 @@
 stages:
   - update
   - build
+  - check
 
 job:on-schedule:
+  stage: check
   only:
     - schedules
   image: $CI_REGISTRY_IMAGE
