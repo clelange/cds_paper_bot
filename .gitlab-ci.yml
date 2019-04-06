@@ -1,7 +1,10 @@
+stages:
+  - update
+  - build
+
 job:on-schedule:
   only:
     - schedules
-    - web
   image: $CI_REGISTRY_IMAGE
   before_script:
     - ls -lisa
@@ -9,7 +12,18 @@ job:on-schedule:
   script:
     - ./.gitlab/script.sh
 
+update_repo:
+  stage: update
+  only:
+    - web
+  image: $CI_REGISTRY_IMAGE
+  before_script:
+    - ./.gitlab/before_script.sh
+  script:
+    - ./.gitlab/update_repo.sh
+
 build_docker:
+  stage: build
   only:
     - web
   tags:
