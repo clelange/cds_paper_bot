@@ -29,9 +29,11 @@ Once created, go to your newly-created project, choose "Settings" -> "CI / CD" a
 | `GIT_SSH_PRIV_KEY` | Content of `cern-gitlab-ci`                                                                              |
 | `REMOTE_GIT_REPO`  | URL for cloning your repository via ssh, e.g. `ssh://git@gitlab.cern.ch:7999/username/cds_paper_bot.git` |
 
+Once this is done, go to "CI / CD" (not the one under "Settings") -> "Pipelines", click on "Run Pipeline" and then "Create pipeline". This will update your clone of the repository from the one on [Github](https://github.com/clelange/cds_paper_bot) and build a new docker container. Whenever there are changes in this repository that you would like to profit from as well, repeat this step.
+
 ## Setting up the bot
 
-Each bot/account will need some specific settings, and the following steps will set things up such that the bot will run on a regular schedule. Go to "CI / CD" (not the one under "Settings") -> "Schedules" and create a new schedule. Choose a name and an "Interval pattern". Mind that the bot cannot run more than once per hour due to the way GitLab cron scheduling works.
+Each bot/account will need some specific settings, and the following steps will set things up such that the bot will run on a regular schedule. Go to "CI / CD" (not the one under "Settings") -> "Schedules" and create a new schedule. To run once per hour at 15 minutes past use `15 * * * *`. Choose a name and an "Interval pattern". Mind that the bot cannot run more than once per hour due to the way GitLab cron scheduling works.
 
 Now add a couple of variables, see [feeds.ini](https://github.com/clelange/cds_paper_bot/blob/master/feeds.ini) for a list of experiments already predefined:
 
