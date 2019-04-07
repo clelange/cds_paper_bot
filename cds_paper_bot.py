@@ -9,6 +9,8 @@ import subprocess
 import re
 import configparser
 from io import BytesIO
+from pathlib import Path
+import zipfile
 import daiquiri
 import feedparser
 from pylatexenc.latexwalker import LatexWalkerError
@@ -42,7 +44,7 @@ CADI_TO_HASHTAG['SMP'] = "#StandardModel"
 CADI_TO_HASHTAG['BPH'] = "#BPhysics"
 
 # identifiers for preliminary results
-PRELIM = ["CMS-PAS", "ATLAS-CONF"]
+PRELIM = ["CMS-PAS", "ATLAS-CONF", "LHCb-CONF"]
 
 
 class Conference(object):
@@ -624,6 +626,24 @@ def main():
                     if out_path.find("%") >= 0:
                         continue
                     downloaded_image_list.append(out_path)
+        # if there's a zip file and only one PDF, the figures are probably in the zip file
+        if len(downloaded_image_list) <= 3 and any(".zip" in s for s in downloaded_image_list):
+            logger.info("using zip file instead of images")
+            zipfile_name = [s for s in downloaded_image_list if ".zip" in s][0]
+            downloaded_image_list = []
+            outzip = f"{outdir}/zipdir"
+            os.makedirs(outzip)
+            with zipfile.ZipFile(zipfile_name) as myzip:
+                myzip.extractall(outzip)
+            image_list = list(Path(outzip).rglob("*.pdf"))
+            # need to convert PosixPath to str
+            str_image_list = [str(img_path) for img_path in image_list]
+            # ignore some files
+            for img_path in sorted(str_image_list):
+                if not ((img_path.find("lhcb-logo.pdf") >= 0) or
+                       (img_path.find("__MACOSX") >= 0) or
+                       (img_path.rsplit("/", 1)[1].startswith("."))):
+                    downloaded_image_list.append(img_path)
         image_ids = []
         if downloaded_image_list:
             image_list = process_images(
