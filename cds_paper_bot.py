@@ -91,7 +91,7 @@ def format_title(title):
     """format the publication title"""
     logger.info("Formatting title.")
     logger.info(title)
-    title = title.replace("\sqrt s", "\sqrt{s}")
+    title = title.replace("\\sqrt s", "\\sqrt{s}")
     if re.search(r"rightarrow\S", title):
         title = title.replace("rightarrow", "rightarrow ")
     overline = re.search(r"overline\s([a-zA-Z])", title)
@@ -108,6 +108,8 @@ def format_title(title):
     for my_char in char_with_spaces:
         pat = re.compile(r"\s?%s\s?" % my_char)
         text_title = re.sub(pat, " %s " % my_char, text_title)
+    # insert space before eV/keV/MeV/GeV/TeV in case of wrong formatting
+    text_title = re.sub(r"(\d)([kMGT]?eV)", r"\1 \2", text_title)
     # reduce all spaces to a maximum of one
     text_title = re.sub(r"\s+", " ", text_title)
     # reduce all underscores to a maximum of one
