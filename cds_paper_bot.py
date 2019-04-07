@@ -94,11 +94,14 @@ def format_title(title):
     logger.info("Formatting title.")
     logger.info(title)
     title = title.replace("\\sqrt s", "\\sqrt{s}")
+    title = title.replace(" \\bar{", "\\bar{")
     if re.search(r"rightarrow\S", title):
         title = title.replace("rightarrow", "rightarrow ")
+    # fix overline without space
     overline = re.search(r"overline\s([a-zA-Z])", title)
     if overline:
         title = title.replace(f"overline {overline.group(1)}", "overline{%s}" % overline.group(1))
+    title = title.replace(" \\overline{", "\\overline{")
     try:
         text_title = LatexNodes2Text().latex_to_text(title)
     except LatexWalkerError as identifier:
