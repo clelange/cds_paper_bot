@@ -9,6 +9,8 @@ import subprocess
 import re
 import configparser
 from io import BytesIO
+from pathlib import Path
+import zipfile
 import daiquiri
 import feedparser
 from pylatexenc.latexwalker import LatexWalkerError
@@ -42,7 +44,7 @@ CADI_TO_HASHTAG['SMP'] = "#StandardModel"
 CADI_TO_HASHTAG['BPH'] = "#BPhysics"
 
 # identifiers for preliminary results
-PRELIM = ["CMS-PAS", "ATLAS-CONF"]
+PRELIM = ["CMS-PAS", "ATLAS-CONF", "LHCb-CONF"]
 
 
 class Conference(object):
@@ -91,12 +93,15 @@ def format_title(title):
     """format the publication title"""
     logger.info("Formatting title.")
     logger.info(title)
-    title = title.replace("\sqrt s", "\sqrt{s}")
+    title = title.replace("\\sqrt s", "\\sqrt{s}")
+    title = title.replace(" \\bar{", "\\bar{")
     if re.search(r"rightarrow\S", title):
         title = title.replace("rightarrow", "rightarrow ")
+    # fix overline without space
     overline = re.search(r"overline\s([a-zA-Z])", title)
     if overline:
         title = title.replace(f"overline {overline.group(1)}", "overline{%s}" % overline.group(1))
+    title = title.replace(" \\overline{", "\\overline{")
     try:
         text_title = LatexNodes2Text().latex_to_text(title)
     except LatexWalkerError as identifier:
@@ -108,10 +113,14 @@ def format_title(title):
     for my_char in char_with_spaces:
         pat = re.compile(r"\s?%s\s?" % my_char)
         text_title = re.sub(pat, " %s " % my_char, text_title)
+    # insert space before eV/keV/MeV/GeV/TeV in case of wrong formatting
+    text_title = re.sub(r"(\d)([kMGT]?eV)", r"\1 \2", text_title)
     # reduce all spaces to a maximum of one
     text_title = re.sub(r"\s+", " ", text_title)
     # reduce all underscores to a maximum of one
     text_title = re.sub(r"_+", "_", text_title)
+    # reduce all hyphens to a maximum of one
+    text_title = re.sub(r"-+", "-", text_title)
     return text_title
 
 
@@ -620,6 +629,24 @@ def main():
                     if out_path.find("%") >= 0:
                         continue
                     downloaded_image_list.append(out_path)
+        # if there's a zip file and only one PDF, the figures are probably in the zip file
+        if len(downloaded_image_list) <= 3 and any(".zip" in s for s in downloaded_image_list):
+            logger.info("using zip file instead of images")
+            zipfile_name = [s for s in downloaded_image_list if ".zip" in s][0]
+            downloaded_image_list = []
+            outzip = f"{outdir}/zipdir"
+            os.makedirs(outzip)
+            with zipfile.ZipFile(zipfile_name) as myzip:
+                myzip.extractall(outzip)
+            image_list = list(Path(outzip).rglob("*.pdf"))
+            # need to convert PosixPath to str
+            str_image_list = [str(img_path) for img_path in image_list]
+            # ignore some files
+            for img_path in sorted(str_image_list):
+                if not ((img_path.find("lhcb-logo.pdf") >= 0) or
+                       (img_path.find("__MACOSX") >= 0) or
+                       (img_path.rsplit("/", 1)[1].startswith("."))):
+                    downloaded_image_list.append(img_path)
         image_ids = []
         if downloaded_image_list:
             image_list = process_images(
