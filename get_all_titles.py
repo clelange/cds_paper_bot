@@ -25,7 +25,7 @@ def main():
     # print(config)
     for experiment in config:
         for pub_type in config[experiment]:
-            print(f"# {experiment} {pub_type}")
+            print(f"            # {experiment} {pub_type}")
             this_feed = read_feed(config[experiment][pub_type])
             if this_feed:
                 this_feed_entries = this_feed["entries"]
@@ -34,7 +34,9 @@ def main():
                     # print(entry.dc_source)
                     input_title = entry.title.replace("\\", "\\\\")
                     formatted_title = format_title(entry.title).replace("\\", "\\\\")
-                    print(f'("{input_title}", "{formatted_title}"),')
+                    print(
+                        f'            ("{input_title}",\n            "{formatted_title}"),'
+                    )
                     # print()
             # break
         # break
