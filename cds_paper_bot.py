@@ -630,7 +630,7 @@ def main():
                         continue
                     downloaded_image_list.append(out_path)
         # if there's a zip file and only one PDF, the figures are probably in the zip file
-        if len(downloaded_image_list) <= 3 and any(".zip" in s for s in downloaded_image_list):
+        if any(".zip" in s for s in downloaded_image_list):
             logger.info("using zip file instead of images")
             zipfile_name = [s for s in downloaded_image_list if ".zip" in s][0]
             downloaded_image_list = []
