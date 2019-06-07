@@ -3,7 +3,7 @@
 set -e
 # echo on
 set -x
-python cds_paper_bot.py -m 1 -e "${EXPERIMENT}"
+python cds_paper_bot.py -m 10 -e "${EXPERIMENT}"
 if [[ -n $(git status -s) ]]; then
     git checkout master
     git add ./*_FEED.txt
