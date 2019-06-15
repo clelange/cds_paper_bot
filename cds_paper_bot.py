@@ -629,9 +629,9 @@ def main():
                     downloaded_image_list.append(out_path)
         # ATLAS notes workaround
         if experiment == "ATLAS" and len(downloaded_image_list) <= 3:
-            logger.debug("SAMEDEBUG\nworkaround")
+            logger.info("SAMEDEBUG\nworkaround")
             confnotepageurl = "https://atlas.web.cern.ch/Atlas/GROUPS/PHYSICS/CONFNOTES/" + identifier + "/"
-            logger.debug("SAMEDEBUG\n" + confnotepageurl)
+            logger.info("SAMEDEBUG\n" + confnotepageurl)
 
         # if there's a zip file and only one PDF, the figures are probably in the zip file
         if len(downloaded_image_list) <= 3 and any(".zip" in s for s in downloaded_image_list):
