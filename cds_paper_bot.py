@@ -13,6 +13,7 @@ from pathlib import Path
 import zipfile
 import daiquiri
 import feedparser
+import lxml.html as lh
 from pylatexenc.latexwalker import LatexWalkerError
 from pylatexenc.latex2text import LatexNodes2Text
 from twython import Twython, TwythonError
