@@ -645,7 +645,7 @@ def main():
             logger.info("SAMEDEBUG\nworkaround")
             confnotepageurl = "https://atlas.web.cern.ch/Atlas/GROUPS/PHYSICS/CONFNOTES/" + identifier + "/"
             logger.info("SAMEDEBUG\n" + confnotepageurl)
-            logger.info("SAMEDEBUG\n" + ' '.join(read_html(confnotepageurl)))
+            # logger.info("SAMEDEBUG\n" + ' '.join(read_html(confnotepageurl)))
             # hxs.select('//a[contains(@href, "image")]/img/@src').extract()
 
         # if there's a zip file and only one PDF, the figures are probably in the zip file
