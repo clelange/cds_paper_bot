@@ -13,7 +13,6 @@ from pathlib import Path
 import zipfile
 import daiquiri
 import feedparser
-from lxml.html import parse
 from pylatexenc.latexwalker import LatexWalkerError
 from pylatexenc.latex2text import LatexNodes2Text
 from twython import Twython, TwythonError
@@ -86,19 +85,6 @@ def read_feed(rss_url):
     # Parse content
     feed = feedparser.parse(content)
     return feed
-
-def read_html(html_url):
-    """read HTML page and return dictionary"""
-    try:
-        response = requests.get(html_url, timeout=10)
-    except requests.ReadTimeout:
-        logger.error("Timeout when reading HTML %s", html_url)
-        return
-    # Turn stream into memory stream object for universal feedparser
-    content = BytesIO(response.content)
-    # Parse content
-    html = parse(content).getroot()
-    return html
 
 def format_title(title):
     """format the publication title"""
@@ -645,9 +631,7 @@ def main():
             logger.debug("SAMEDEBUG\nworkaround")
             confnotepageurl = "https://atlas.web.cern.ch/Atlas/GROUPS/PHYSICS/CONFNOTES/" + identifier + "/"
             logger.debug("SAMEDEBUG\n" + confnotepageurl)
-            this_html = read_html(confnotepageurl)
-            logger.debug("SAMEDEBUG\n" + this_html)
-            
+
         # if there's a zip file and only one PDF, the figures are probably in the zip file
         if len(downloaded_image_list) <= 3 and any(".zip" in s for s in downloaded_image_list):
             logger.info("using zip file instead of images")
