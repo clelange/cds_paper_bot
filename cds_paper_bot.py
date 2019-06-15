@@ -87,6 +87,19 @@ def read_feed(rss_url):
     feed = feedparser.parse(content)
     return feed
 
+def read_html(html_url):
+    """read the HTML page and return dictionary"""
+    try:
+        response = requests.get(html_url, timeout=10)
+    except requests.ReadTimeout:
+        logger.error("Timeout when reading HTML %s", html_url)
+        return
+    # Turn stream into memory stream object for universal feedparser
+    content = BytesIO(response.content)
+    # Parse content
+    html = lh.parse(content)
+    return html
+
 def format_title(title):
     """format the publication title"""
     logger.info("Formatting title.")
@@ -632,6 +645,8 @@ def main():
             logger.info("SAMEDEBUG\nworkaround")
             confnotepageurl = "https://atlas.web.cern.ch/Atlas/GROUPS/PHYSICS/CONFNOTES/" + identifier + "/"
             logger.info("SAMEDEBUG\n" + confnotepageurl)
+            logger.info("SAMEDEBUG\n" + read_html(confnotepageurl))
+            # hxs.select('//a[contains(@href, "image")]/img/@src').extract()
 
         # if there's a zip file and only one PDF, the figures are probably in the zip file
         if len(downloaded_image_list) <= 3 and any(".zip" in s for s in downloaded_image_list):
