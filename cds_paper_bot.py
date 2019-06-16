@@ -97,6 +97,7 @@ def read_html(html_url):
     # Turn stream into memory stream object for universal feedparser
     content = BytesIO(response.content)
     # Parse content
+    # html = lh.fromstring(content)
     html = lh.parse(content)
     return html
 
@@ -645,8 +646,8 @@ def main():
             logger.info("SAMEDEBUG\nworkaround")
             confnotepageurl = "https://atlas.web.cern.ch/Atlas/GROUPS/PHYSICS/CONFNOTES/" + identifier + "/"
             logger.info("SAMEDEBUG\n" + confnotepageurl)
-            # logger.info("SAMEDEBUG\n" + ' '.join(read_html(confnotepageurl)))
-            # hxs.select('//a[contains(@href, "image")]/img/@src').extract()
+            linkedimages = read_html(confnotepageurl).xpath('//a[img]/@href')
+            logger.info("SAMEDEBUG\n" + repr(linkedimages))
 
         # if there's a zip file and only one PDF, the figures are probably in the zip file
         if len(downloaded_image_list) <= 3 and any(".zip" in s for s in downloaded_image_list):
