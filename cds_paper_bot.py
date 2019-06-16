@@ -648,6 +648,28 @@ def main():
             logger.info("SAMEDEBUG\n" + confnotepageurl)
             linkedimages = read_html(confnotepageurl).xpath('//a[img]/@href')
             logger.info("SAMEDEBUG\n" + repr(linkedimages))
+            for image in linkedimages:
+                if not image.lower().endswith(".png"):
+                    continue
+                media_found = True
+                media_url = confnotepageurl + image 
+                logger.info("SAMEDEBUG\n" + "media: " + media_url)
+                request = requests.get(media_url, timeout=10)
+                if not request.status_code < 400:
+                    logger.error("media: " + media_url + " does not exist!")
+                    media_found = False
+
+                if media_found:
+                    # download images
+                    out_path = "{}/{}".format(outdir, media_url.rsplit("/", 1)[1])
+                    request = requests.get(media_url, stream=True)
+                    if request.status_code == 200:
+                        with open(out_path, 'wb') as file_handler:
+                            request.raw.decode_content = True
+                            shutil.copyfileobj(request.raw, file_handler)
+                        if out_path.find("%") >= 0:
+                            continue
+                        downloaded_image_list.append(out_path)
 
         # if there's a zip file and only one PDF, the figures are probably in the zip file
         if len(downloaded_image_list) <= 3 and any(".zip" in s for s in downloaded_image_list):
