@@ -23,7 +23,6 @@ from wand.image import Image, Color
 from wand.exceptions import CorruptImageError  # pylint: disable=no-name-in-module
 import imageio
 
-
 # Maximum image dimension (both x and y)
 MAX_IMG_DIM = 1200
 MAX_IMG_SIZE = 5242880
@@ -348,7 +347,6 @@ def load_config(experiment, feed_file, auth_file):
         config_dict["AUTH"][key.upper()] = config[experiment][key]
     return config_dict
 
-
 def upload_images(twitter, image_list, post_gif):
     """Upload images to twitter and return locations."""
     logger.info("Uploading images.")
@@ -382,7 +380,6 @@ def upload_images(twitter, image_list, post_gif):
     logger.debug(image_ids)
     return image_ids
 
-
 def split_text(identifier, title, hashtags_link, short_url_length, maxlength, bot_handle):
     """Split tweet into several including hashtags and URL in first one"""
     logger.info("Splitting text.")
@@ -412,7 +409,6 @@ def split_text(identifier, title, hashtags_link, short_url_length, maxlength, bo
             message = bot_handle + " " + message
         message_list.append(message)
     return message_list
-
 
 def tweet(twitter, identifier, title, link, conf_hashtags, image_ids, post_gif, bot_handle):
     """tweet the new results with title and link and pictures taking care of length limitations."""
@@ -470,7 +466,6 @@ def tweet(twitter, identifier, title, link, conf_hashtags, image_ids, post_gif, 
             logger.debug(response)
     return response
 
-
 def check_id_exists(identifier, feed_id):
     """Check with ID of the analysis already exists in text file to avoid tweeting again."""
     txt_file_name = "%s.txt" % feed_id
@@ -483,13 +478,11 @@ def check_id_exists(identifier, feed_id):
                 return True
     return False
 
-
 def store_id(identifier, feed_id):
     """Store ID of the analysis in text file to avoid tweeting again."""
     txt_file_name = "%s.txt" % feed_id
     with open(txt_file_name, 'a') as txt_file:
         txt_file.write("%s\n" % identifier)
-
 
 def main():
     """Main function."""
@@ -641,19 +634,22 @@ def main():
                     if out_path.find("%") >= 0:
                         continue
                     downloaded_image_list.append(out_path)
+
         # ATLAS notes workaround
-        if experiment == "ATLAS" and len(downloaded_image_list) <= 3:
-            logger.info("SAMEDEBUG\nworkaround")
+        if experiment == "ATLAS" and len(downloaded_image_list) == 0:
             confnotepageurl = "https://atlas.web.cern.ch/Atlas/GROUPS/PHYSICS/CONFNOTES/" + identifier + "/"
-            logger.info("SAMEDEBUG\n" + confnotepageurl)
             linkedimages = read_html(confnotepageurl).xpath('//a[img]/@href')
-            logger.info("SAMEDEBUG\n" + repr(linkedimages))
             for image in linkedimages:
+                # ATLAS only uses PNG format for plots
                 if not image.lower().endswith(".png"):
                     continue
+                # skip tables and aux for this purpose
+                if image.lower().startswith("tab") or image.lower().contains("aux"):
+                    continue
+                # now this part is (for now) just a copy-n-paste from above (sorry about that)
                 media_found = True
                 media_url = confnotepageurl + image 
-                logger.info("SAMEDEBUG\n" + "media: " + media_url)
+                logger.debug("media: " + media_url)
                 request = requests.get(media_url, timeout=10)
                 if not request.status_code < 400:
                     logger.error("media: " + media_url + " does not exist!")
@@ -745,7 +741,6 @@ def main():
             shutil.rmtree(outdir)
         if tweet_count >= max_tweets:
             return
-
 
 if __name__ == '__main__':
     main()
