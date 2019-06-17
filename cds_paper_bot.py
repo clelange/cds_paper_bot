@@ -644,7 +644,7 @@ def main():
                 if not image.lower().endswith(".png"):
                     continue
                 # skip tables and aux for this purpose
-                if image.lower().startswith("tab") or image.lower().contains("aux"):
+                if image.lower().startswith("tab") or "aux" in image.lower():
                     continue
                 # now this part is (for now) just a copy-n-paste from above (sorry about that)
                 media_found = True
