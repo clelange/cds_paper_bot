@@ -685,6 +685,12 @@ def main():
                        (img_path.find("__MACOSX") >= 0) or
                        (img_path.rsplit("/", 1)[1].startswith("."))):
                     downloaded_image_list.append(img_path)
+
+        # skip entries without media
+        if experiment == "ATLAS" and not downloaded_image_list:
+            logger.info("No media found! Skipping entry.")
+            continue
+        
         image_ids = []
         if downloaded_image_list:
             image_list = process_images(
@@ -712,6 +718,7 @@ def main():
             title_formatted = title_formatted.encode('utf8')
         logger.info("{}: {} {}".format(
             identifier, title_formatted, " ".join(filter(None, [conf_hashtags, link]))))
+        
         if not dry_run:
             tweet_response = tweet(twitter, identifier, title_formatted, link, conf_hashtags,
                                    image_ids, post_gif, config['AUTH']['BOT_HANDLE'])
