@@ -65,8 +65,8 @@ class Conference(object):
 
 CONFERENCES = []
 # CONFERENCES.append(Conference("Moriond", maya.parse(f'{maya.now().year}-03-09'), maya.parse(f'{maya.now().year}-04-05')))
-CONFERENCES.append(Conference("EPSHEP2019", maya.parse(f'2019-07-08'), maya.parse(f'2019-07-17')))
-CONFERENCES.append(Conference("LeptonPhoton19", maya.parse(f'2019-08-03'), maya.parse(f'2019-10-10')))
+CONFERENCES.append(Conference("EPSHEP2019", maya.parse("2019-07-08"), maya.parse("2019-07-17")))
+CONFERENCES.append(Conference("LeptonPhoton19", maya.parse("2019-08-03"), maya.parse("2019-10-10")))
 
 daiquiri.setup(level=logging.INFO)
 logger = daiquiri.getLogger()  # pylint: disable=invalid-name
