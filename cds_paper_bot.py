@@ -542,7 +542,7 @@ def main():
         if this_feed:
             this_feed_entries = this_feed["entries"]
             logger.info("Found %d items" % len(this_feed_entries))
-            logger.info("In total %d items" % this_feed["opensearch_totalResults"])
+            logger.info("In total %d items" % this_feed["feed"]["opensearch:totalResults"])
             # add feed info to entries so that we can loop more easily later
             for index, _ in enumerate(this_feed_entries):
                 this_feed_entries[index]["feed_id"] = key
