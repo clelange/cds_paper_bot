@@ -713,7 +713,7 @@ def main():
         # use only for PAS/CONF notes:
         if prelim_result:
             other_hashtags = "#ATLASnote"
-        else
+        else:
             other_hashtags = "#ATLASpaper"
 
         title_formatted = format_title(title)
