@@ -708,15 +708,22 @@ def main():
             conf_hashtags = " ".join(filter(None, (conf.is_now(
                 post["published"]) for conf in CONFERENCES)))
             logger.info(f"Conference hashtags: {conf_hashtags}")
+            
+        other_hashtags = ""
+        # use only for PAS/CONF notes:
+        if prelim_result:
+            other_hashtags = "#ATLASnote"
+        else
+            other_hashtags = "#ATLASpaper"
 
         title_formatted = format_title(title)
         if sys.version_info[0] < 3:
             title_formatted = title_formatted.encode('utf8')
         logger.info("{}: {} {}".format(
-            identifier, title_formatted, " ".join(filter(None, [conf_hashtags, link]))))
+            identifier, title_formatted, " ".join(filter(None, [conf_hashtags, link, other_hashtags]))))
         
-        # skip entries without media for ATLAS
-        if experiment == "ATLAS" and not downloaded_image_list:
+        # skip entries without media
+        if not downloaded_image_list:
             logger.info("No media found! Skipping entry.")
             continue
         
