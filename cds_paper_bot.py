@@ -712,7 +712,7 @@ def main():
         other_hashtags = ""
         # use only for PAS/CONF notes:
         if prelim_result:
-            other_hashtags = "#ATLASnote"
+            other_hashtags = "#ATLASconf"
         else:
             other_hashtags = "#ATLASpaper"
 
