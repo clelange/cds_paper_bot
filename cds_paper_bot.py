@@ -685,11 +685,6 @@ def main():
                        (img_path.rsplit("/", 1)[1].startswith("."))):
                     downloaded_image_list.append(img_path)
 
-        # skip entries without media
-        if experiment == "ATLAS" and not downloaded_image_list:
-            logger.info("No media found! Skipping entry.")
-            continue
-        
         image_ids = []
         if downloaded_image_list:
             image_list = process_images(
@@ -706,17 +701,24 @@ def main():
             if identifier.find(item) >= 0:
                 prelim_result = True
                 logger.info("This is a preliminary result.")
+
         conf_hashtags = ""
         # use only for PAS/CONF notes:
         if prelim_result:
             conf_hashtags = " ".join(filter(None, (conf.is_now(
                 post["published"]) for conf in CONFERENCES)))
             logger.info(f"Conference hashtags: {conf_hashtags}")
+
         title_formatted = format_title(title)
         if sys.version_info[0] < 3:
             title_formatted = title_formatted.encode('utf8')
         logger.info("{}: {} {}".format(
             identifier, title_formatted, " ".join(filter(None, [conf_hashtags, link]))))
+        
+        # skip entries without media for ATLAS
+        if experiment == "ATLAS" and not downloaded_image_list:
+            logger.info("No media found! Skipping entry.")
+            continue
         
         if not dry_run:
             tweet_response = tweet(twitter, identifier, title_formatted, link, conf_hashtags,
