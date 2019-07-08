@@ -407,7 +407,7 @@ def split_text(type_hashtag, title, identifier, link, conf_hashtags, tweet_lengt
             message = " ".join(filter(None, [message, link, conf_hashtags]))
             first_message = False
         message_list.append(message)
-        logger.info("  " + message)
+        logger.info("  '" + message + "'")
     return message_list
 
 def split_textOLD(identifier, title, hashtags_link, short_url_length, maxlength, bot_handle):
@@ -792,11 +792,11 @@ def main():
         title_formatted = format_title(title)
         if sys.version_info[0] < 3:
             title_formatted = title_formatted.encode('utf8')
-        logger.info("{}: {} {}".format(
-            identifier, title_formatted, " ".join(filter(None, [conf_hashtags, link]))))
+        # logger.info("{}: {} {}".format(
+        #    identifier, title_formatted, " ".join(filter(None, [conf_hashtags, link]))))
             
-        title_temp = type_hashtag + ": " + title_formatted + " (" + identifier + ") " + link + " " + conf_hashtags
-        logger.info("DEBUG: {}".format(title_temp))
+        # title_temp = type_hashtag + ": " + title_formatted + " (" + identifier + ") " + link + " " + conf_hashtags
+        # logger.info("DEBUG: {}".format(title_temp))
         
         # skip entries without media
         if not downloaded_image_list:
