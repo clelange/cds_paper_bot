@@ -379,7 +379,7 @@ def upload_images(twitter, image_list, post_gif):
     logger.debug(image_ids)
     return image_ids
 
-def split_text(identifier, title, hashtags_link, short_url_length, maxlength, bot_handle):
+def split_textOLD(identifier, title, hashtags_link, short_url_length, maxlength, bot_handle):
     """Split tweet into several including hashtags and URL in first one"""
     logger.info("Splitting text.")
     message_list = []
@@ -409,7 +409,7 @@ def split_text(identifier, title, hashtags_link, short_url_length, maxlength, bo
         message_list.append(message)
     return message_list
 
-def tweet(twitter, identifier, title, link, conf_hashtags, image_ids, post_gif, bot_handle):
+def tweetOLD(twitter, identifier, title, link, conf_hashtags, image_ids, post_gif, bot_handle):
     """tweet the new results with title and link and pictures taking care of length limitations."""
     logger.info("Creating tweet.")
     # https://dev.twitter.com/rest/reference/get/help/configuration
@@ -422,7 +422,7 @@ def tweet(twitter, identifier, title, link, conf_hashtags, image_ids, post_gif, 
         short_url_length = len(hashtags_link)
     maxlength = tweet_length - short_url_length
 
-    message_list = split_text(identifier, title, hashtags_link,
+    message_list = split_textOLD(identifier, title, hashtags_link,
                               tweet_length, maxlength, bot_handle)
     first_message = True
     previous_status_id = None
@@ -709,18 +709,21 @@ def main():
                 post["published"]) for conf in CONFERENCES)))
             logger.info(f"Conference hashtags: {conf_hashtags}")
             
-        other_hashtags = ""
+        type_hashtag = ""
         # use only for PAS/CONF notes:
         if prelim_result:
-            other_hashtags = "#ATLASconf"
+            type_hashtag = "#ATLASconf"
         else:
-            other_hashtags = "#ATLASpaper"
+            type_hashtag = "#ATLASpaper"
 
         title_formatted = format_title(title)
         if sys.version_info[0] < 3:
             title_formatted = title_formatted.encode('utf8')
         logger.info("{}: {} {}".format(
-            identifier, title_formatted, " ".join(filter(None, [conf_hashtags, link, other_hashtags]))))
+            identifier, title_formatted, " ".join(filter(None, [conf_hashtags, link]))))
+            
+        title_final = "New " + type_hashtag + ": " + title_formatted + " (" + identifier + ") " + link + " " + conf_hashtags
+        logger.info("DEBUG: {}".format(title_final))
         
         # skip entries without media
         if not downloaded_image_list:
@@ -728,7 +731,7 @@ def main():
             continue
         
         if not dry_run:
-            tweet_response = tweet(twitter, identifier, title_formatted, link, conf_hashtags,
+            tweet_response = tweetOLD(twitter, identifier, title_formatted, link, conf_hashtags,
                                    image_ids, post_gif, config['AUTH']['BOT_HANDLE'])
             if not tweet_response:
                 # try to recover since something went wrong
@@ -740,13 +743,13 @@ def main():
                             outdir, downloaded_image_list, post_gif=False)
                         image_ids = upload_images(
                             twitter, image_list, post_gif=False)
-                        tweet_response = tweet(
+                        tweet_response = tweetOLD(
                             twitter, identifier, title_formatted, link, conf_hashtags, image_ids,
                             post_gif=False, bot_handle=config['AUTH']['BOT_HANDLE'])
             if not tweet_response:
                 # second, try to tweet without image
                 logger.info("Trying to tweet without images")
-                tweet_response = tweet(
+                tweet_response = tweetOLD(
                     twitter, identifier, title_formatted, link, conf_hashtags, image_ids=[],
                     post_gif=False, bot_handle=config['AUTH']['BOT_HANDLE'])
             if tweet_response:
