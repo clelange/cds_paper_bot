@@ -804,8 +804,8 @@ def main():
             continue
         
         if not dry_run:
-            tweet_response = tweetOLD(twitter, identifier, title_formatted, link, conf_hashtags, image_ids, post_gif, config['AUTH']['BOT_HANDLE'])
-            # tweet_response = tweet(twitter, type_hashtag, title_formatted, identifier, link, conf_hashtags, image_ids, post_gif, config['AUTH']['BOT_HANDLE'])
+            # tweet_response = tweetOLD(twitter, identifier, title_formatted, link, conf_hashtags, image_ids, post_gif, config['AUTH']['BOT_HANDLE'])
+            tweet_response = tweet(twitter, type_hashtag, title_formatted, identifier, link, conf_hashtags, image_ids, post_gif, config['AUTH']['BOT_HANDLE'])
             
             if not tweet_response:
                 # try to recover since something went wrong
@@ -817,13 +817,13 @@ def main():
                             outdir, downloaded_image_list, post_gif=False)
                         image_ids = upload_images(
                             twitter, image_list, post_gif=False)
-                        tweet_response = tweetOLD(twitter, identifier, title_formatted, link, conf_hashtags, image_ids, post_gif=False, bot_handle=config['AUTH']['BOT_HANDLE'])
-                        # tweet_response = tweet(twitter, type_hashtag, title_formatted, identifier, link, conf_hashtags, image_ids, post_gif=False, bot_handle=config['AUTH']['BOT_HANDLE'])
+                        # tweet_response = tweetOLD(twitter, identifier, title_formatted, link, conf_hashtags, image_ids, post_gif=False, bot_handle=config['AUTH']['BOT_HANDLE'])
+                        tweet_response = tweet(twitter, type_hashtag, title_formatted, identifier, link, conf_hashtags, image_ids, post_gif=False, bot_handle=config['AUTH']['BOT_HANDLE'])
             if not tweet_response:
                 # second, try to tweet without image
                 logger.info("Trying to tweet without images")
-                tweet_response = tweetOLD(twitter, identifier, title_formatted, link, conf_hashtags, image_ids=[], post_gif=False, bot_handle=config['AUTH']['BOT_HANDLE'])
-                # tweet_response = tweet(twitter, type_hashtag, title_formatted, identifier, link, conf_hashtags, image_ids=[], post_gif=False, bot_handle=config['AUTH']['BOT_HANDLE'])
+                # tweet_response = tweetOLD(twitter, identifier, title_formatted, link, conf_hashtags, image_ids=[], post_gif=False, bot_handle=config['AUTH']['BOT_HANDLE'])
+                tweet_response = tweet(twitter, type_hashtag, title_formatted, identifier, link, conf_hashtags, image_ids=[], post_gif=False, bot_handle=config['AUTH']['BOT_HANDLE'])
             if tweet_response:
                 store_id(identifier, post["feed_id"])
         if not keep_image_dir:
