@@ -509,7 +509,7 @@ def main():
     tweet_count = 0
     for post in sorted(feed_entries, key=lambda x: maya.parse(x["published"]).datetime()):
         downloaded_image_list = []
-        downloaded_docs_list = []
+        downloaded_doc_list = []
         logger.debug(post)
         identifier = post["dc_source"]
         # fix wrong PAS name:
@@ -589,7 +589,7 @@ def main():
                         downloaded_image_list.append(out_path)
                         logger.info("image: " + out_path + " downloaded!")
                     else:
-                        downloaded_docs_list.append(out_path)
+                        downloaded_doc_list.append(out_path)
                         logger.info("doc: " + out_path + " downloaded!")
 
         # ATLAS notes workaround
