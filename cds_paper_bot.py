@@ -509,6 +509,7 @@ def main():
     tweet_count = 0
     for post in sorted(feed_entries, key=lambda x: maya.parse(x["published"]).datetime()):
         downloaded_image_list = []
+        downloaded_docs_list = []
         logger.debug(post)
         identifier = post["dc_source"]
         # fix wrong PAS name:
@@ -521,17 +522,13 @@ def main():
             if analysis_id not in identifier:
                 continue
             else:
-                logger.info("Found %s in feed %s" %
-                            (identifier, post["feed_id"]))
+                logger.info("Found %s in feed %s" % (identifier, post["feed_id"]))
         elif check_id_exists(identifier, post["feed_id"]):
-            logger.debug("%s has already been tweeted for feed %s" %
-                         (identifier, post["feed_id"]))
+            logger.debug("%s has already been tweeted for feed %s" % (identifier, post["feed_id"]))
             continue
         tweet_count += 1
-        logger.info("{id} - published: {date}".format(id=identifier,
-                                                      date=maya.parse(post["published"]).datetime()))
-        # if post is already in the database, skip it
-        media_content = []
+        logger.info("{id} - published: {date}".format(id=identifier, date=maya.parse(post["published"]).datetime()))
+
         arxiv_id = ""
         # try to find arXiv ID
         if identifier.startswith("arXiv"):
@@ -543,6 +540,9 @@ def main():
             if request.status_code >= 400:
                 logger.warning(f"arXiv URL {arxiv_link} seems invalid")
                 arxiv_link = None
+
+        # looking for media
+        media_content = []
         if "media_content" in post:
             media_content += post["media_content"]
         outdir = identifier.replace(':', '_')
@@ -551,28 +551,34 @@ def main():
         logger.debug("Attempting to download media.")
         for media in media_content:
             media_url = media["url"]
-            # consider only attached Figures
+            media_found = False
+            media_isimage = False
+            # consider only attached figures and main doc
             if experiment == "CMS":
                 # CMS follows a certain standard
                 # but figures can be both PDF and PNG
-                if not re.search(r"/files\/.*[Ff]igures?_", media_url):
-                    continue
+                if re.search(r"/files\/.*[Ff]igures?_", media_url):
+                    media_found = True
+                    media_isimage = True
             elif experiment == "ATLAS":
                 # ATLAS seems to only use PNG format for plots
-                if not media_url.lower().endswith(".png"):
-                    continue
-            media_found = True
-            media_url = media_url.split("?", 1)[0]
-            logger.debug("media: " + media_url)
-            request = requests.get(media_url, timeout=10)
-            if not request.status_code < 400:
-                logger.error("media: " + media_url + " does not exist!")
-                media_found = False
-
+                if media_url.lower().endswith(".png"):
+                    media_found = True
+                    media_isimage = True
+                elif re.search(r"^" + re.escape(post.link) + "/files\/(?![Ff]ig).*\.pdf$", media_url):
+                    media_found = True
+            # check if media can be downloaded
+            if media_found:
+                media_url = media_url.split("?", 1)[0]
+                logger.info("media: " + media_url)
+                request = requests.get(media_url, timeout=10)
+                if not request.status_code < 400:
+                    logger.error("media: " + media_url + " does not exist!")
+                    media_found = False
+            # download and categorise media
             if media_found:
                 # download images
-                out_path = "{}/{}".format(outdir,
-                                          media_url.rsplit("/", 1)[1])
+                out_path = "{}/{}".format(outdir, media_url.rsplit("/", 1)[1])
                 request = requests.get(media_url, stream=True)
                 if request.status_code == 200:
                     with open(out_path, 'wb') as file_handler:
@@ -580,7 +586,10 @@ def main():
                         shutil.copyfileobj(request.raw, file_handler)
                     if out_path.find("%") >= 0:
                         continue
-                    downloaded_image_list.append(out_path)
+                    if media_isimage:
+                        downloaded_image_list.append(out_path)
+                    else:
+                        downloaded_docs_list.append(out_path)
 
         # ATLAS notes workaround
         if experiment == "ATLAS" and len(downloaded_image_list) == 0:
