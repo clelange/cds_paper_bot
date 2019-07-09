@@ -588,8 +588,10 @@ def main():
                         continue
                     if media_isimage:
                         downloaded_image_list.append(out_path)
+                        logger.error("image: " + out_path + " downloaded!")
                     else:
                         downloaded_docs_list.append(out_path)
+                        logger.error("doc: " + out_path + " downloaded!")
 
         # ATLAS notes workaround
         if experiment == "ATLAS" and len(downloaded_image_list) == 0:
