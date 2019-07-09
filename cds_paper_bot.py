@@ -569,7 +569,7 @@ def main():
             # check if media can be downloaded
             if media_found:
                 media_url = media_url.split("?", 1)[0]
-                logger.info("media: " + media_url)
+                logger.debug("media: " + media_url)
                 request = requests.get(media_url, timeout=10)
                 if not request.status_code < 400:
                     logger.error("media: " + media_url + " does not exist!")
@@ -587,10 +587,10 @@ def main():
                         continue
                     if media_isimage:
                         downloaded_image_list.append(out_path)
-                        logger.info("image: " + out_path + " downloaded!")
+                        logger.debug("image: " + out_path + " downloaded!")
                     else:
                         downloaded_doc_list.append(out_path)
-                        logger.info("doc: " + out_path + " downloaded!")
+                        logger.debug("doc: " + out_path + " downloaded!")
 
         # ATLAS notes workaround
         if experiment == "ATLAS" and len(downloaded_image_list) == 0:
