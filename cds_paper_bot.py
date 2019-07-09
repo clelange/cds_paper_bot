@@ -133,7 +133,6 @@ def format_title(title):
     text_title = re.sub(r"-+", "-", text_title)
     return text_title
 
-
 def execute_command(command):
     """execute shell command using subprocess..."""
     proc = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
@@ -148,7 +147,6 @@ def execute_command(command):
         for line in proc.stdout:
             result = result + line
         logger.debug(result)
-
 
 def process_images(identifier, downloaded_image_list, post_gif, use_wand=True, use_imageio=True):
     """Convert/resize all images to png."""
@@ -222,44 +220,6 @@ def process_images(identifier, downloaded_image_list, post_gif, use_wand=True, u
                     if img.size[i] > max_dim[i]:
                         max_dim[i] = img.size[i]
                 img.save(filename=filename)
-
-    # for image_file in downloaded_image_list:
-    #     if use_wand:
-    #         # already processed non-PDF files with wand
-    #         if not image_file.endswith('pdf'):
-    #             with Image(filename="{}[0]".format(image_file)) as img:
-    #                 img.format = new_image_format
-    #                 img.background_color = Color('white')
-    #                 img.compression_quality = 75
-    #                 img.alpha_channel = 'remove'
-    #                 img.trim(fuzz=0.01)
-    #                 img.reset_coords()  # same as repage
-    #                 # resize to maximally the size of the converted PDFs
-    #                 logger.debug("img.size[0] = {}, img.size[1] = {}".format(img.size[0],
-    #                                                                          img.size[1]))
-    #                 side_to_scale = max(img.size[0], img.size[1])
-    #                 scale_factor = max(max_dim[0], max_dim[
-    #                                    1]) / float(side_to_scale)
-    #                 if scale_factor < 1:
-    #                     img.resize(
-    #                         int(img.size[0] * scale_factor), int(img.size[1] * scale_factor))
-    #                 # give the file a different name
-    #                 filesplit = image_file.rsplit(".", 1)
-    #                 filename = filesplit[0] + "_." + filesplit[1]
-    #                 # save image in list
-    #                 image_list.append(filename)
-    #                 img.save(filename=filename)
-    #     else:
-    #         # if using convert, no special treatment at the moment
-    #         command = "convert -quality 75% -trim"  # trim to get rid of whitespace
-    #         with Image(filename="{}[0]".format(image_file)) as img:  # , resolution=300
-    #             if (img.size[0] > MAX_IMG_DIM) or (img.size[1] > MAX_IMG_DIM):
-    #                 scale_factor = 100 * MAX_IMG_DIM / \
-    #                     float(max(img.size[0], img.size[1]))
-    #                 command += " -resize {}%".format(int(scale_factor))
-    #             filename = image_file.replace(".pdf", ".%s" % new_image_format)
-    #             command += "%s %s" % (image_file, filename)
-    #             execute_command(command)
 
     # bring list in order again
     image_list = sorted(image_list)
@@ -410,36 +370,6 @@ def split_text(type_hashtag, title, identifier, link, conf_hashtags, tweet_lengt
         logger.info("  '" + message + "'")
     return message_list
 
-def split_textOLD(identifier, title, hashtags_link, short_url_length, maxlength, bot_handle):
-    """Split tweet into several including hashtags and URL in first one"""
-    logger.info("Splitting text.")
-    message_list = []
-    remaining_text = "{}: {}".format(identifier, title)
-    first_message = True
-    while remaining_text:
-        message = remaining_text.lstrip()
-        allowed_length = short_url_length
-        if first_message:
-            allowed_length = maxlength
-        else:
-            message = ".." + message
-        if len(message) > allowed_length:
-            # strip message at last whitespace and account for 3 dots
-            cut_position = message[:allowed_length - 3].rfind(" ")
-            message = message[:cut_position]
-            remaining_text = remaining_text[cut_position:]
-            if cut_position + 3 > len(remaining_text):
-                message = message.strip() + ".."
-        else:
-            remaining_text = ""
-        if first_message:
-            message = "{} {}".format(message, hashtags_link)
-            first_message = False
-        else:
-            message = bot_handle + " " + message
-        message_list.append(message)
-    return message_list
-
 def tweet(twitter, type_hashtag, title, identifier, link, conf_hashtags, image_ids, post_gif, bot_handle):
     """tweet the new results with title and link and pictures taking care of length limitations."""
     # type_hashtag: title (identifier) link conf_hashtags
@@ -476,61 +406,6 @@ def tweet(twitter, type_hashtag, title, identifier, link, conf_hashtags, image_i
         else:
             try:
                 response = twitter.update_status(status=message, media_ids=image_ids[i * 4:(i + 1) * 4], in_reply_to_status_id=previous_status_id)
-            except TwythonError as twython_error:
-                print(twython_error)
-                logger.error(response)
-                return None
-            logger.debug(response)
-    return response
-
-def tweetOLD(twitter, identifier, title, link, conf_hashtags, image_ids, post_gif, bot_handle):
-    """tweet the new results with title and link and pictures taking care of length limitations."""
-    logger.info("Creating tweet.")
-    # https://dev.twitter.com/rest/reference/get/help/configuration
-    tweet_length = 280
-    # twitter.get_twitter_configuration()['short_url_length']
-    short_url_length = len(link)
-    hashtags_link = link
-    if conf_hashtags:
-        hashtags_link = f"{conf_hashtags} {link}"
-        short_url_length = len(hashtags_link)
-    maxlength = tweet_length - short_url_length
-
-    message_list = split_textOLD(identifier, title, hashtags_link, tweet_length, maxlength, bot_handle)
-    first_message = True
-    previous_status_id = None
-    response = {}
-    for i, message in enumerate(message_list):
-        logger.info(message)
-        logger.debug(len(message))
-        if "id" in response:
-            previous_status_id = response["id"]
-        if post_gif:
-            if first_message:
-                try:
-                    response = twitter.update_status(
-                        status=message, media_ids=image_ids)
-                except TwythonError as twython_error:
-                    print(twython_error)
-                    logger.error(response)
-                    sys.exit(1)
-                first_message = False
-                logger.debug(response)
-            else:
-                try:
-                    response = twitter.update_status(status=message,
-                                                     in_reply_to_status_id=previous_status_id)
-                except TwythonError as twython_error:
-                    print(twython_error)
-                    logger.error(response)
-                    return None
-                logger.debug(response)
-        else:
-            try:
-                response = twitter.update_status(status=message,
-                                                 media_ids=image_ids[
-                                                     i * 4:(i + 1) * 4],
-                                                 in_reply_to_status_id=previous_status_id)
             except TwythonError as twython_error:
                 print(twython_error)
                 logger.error(response)
@@ -720,7 +595,7 @@ def main():
                     continue
                 # now this part is (for now) just a copy-n-paste from above (sorry about that)
                 media_found = True
-                media_url = confnotepageurl + image 
+                media_url = confnotepageurl + image
                 logger.debug("media: " + media_url)
                 request = requests.get(media_url, timeout=10)
                 if not request.status_code < 400:
@@ -781,7 +656,7 @@ def main():
             conf_hashtags = " ".join(filter(None, (conf.is_now(
                 post["published"]) for conf in CONFERENCES)))
             logger.info(f"Conference hashtags: {conf_hashtags}")
-            
+
         type_hashtag = "publication"
         if experiment == "ATLAS":
             if prelim_result:
@@ -792,21 +667,18 @@ def main():
         title_formatted = format_title(title)
         if sys.version_info[0] < 3:
             title_formatted = title_formatted.encode('utf8')
-        # logger.info("{}: {} {}".format(
-        #    identifier, title_formatted, " ".join(filter(None, [conf_hashtags, link]))))
-            
+
         # title_temp = type_hashtag + ": " + title_formatted + " (" + identifier + ") " + link + " " + conf_hashtags
-        # logger.info("DEBUG: {}".format(title_temp))
-        
+        # logger.info(title_temp)
+
         # skip entries without media
         if not downloaded_image_list:
             logger.info("No media found! Skipping entry.")
             continue
-        
+
         if not dry_run:
-            # tweet_response = tweetOLD(twitter, identifier, title_formatted, link, conf_hashtags, image_ids, post_gif, config['AUTH']['BOT_HANDLE'])
             tweet_response = tweet(twitter, type_hashtag, title_formatted, identifier, link, conf_hashtags, image_ids, post_gif, config['AUTH']['BOT_HANDLE'])
-            
+
             if not tweet_response:
                 # try to recover since something went wrong
                 # first, try to use individual images instead of GIF
@@ -817,12 +689,10 @@ def main():
                             outdir, downloaded_image_list, post_gif=False)
                         image_ids = upload_images(
                             twitter, image_list, post_gif=False)
-                        # tweet_response = tweetOLD(twitter, identifier, title_formatted, link, conf_hashtags, image_ids, post_gif=False, bot_handle=config['AUTH']['BOT_HANDLE'])
                         tweet_response = tweet(twitter, type_hashtag, title_formatted, identifier, link, conf_hashtags, image_ids, post_gif=False, bot_handle=config['AUTH']['BOT_HANDLE'])
             if not tweet_response:
                 # second, try to tweet without image
                 logger.info("Trying to tweet without images")
-                # tweet_response = tweetOLD(twitter, identifier, title_formatted, link, conf_hashtags, image_ids=[], post_gif=False, bot_handle=config['AUTH']['BOT_HANDLE'])
                 tweet_response = tweet(twitter, type_hashtag, title_formatted, identifier, link, conf_hashtags, image_ids=[], post_gif=False, bot_handle=config['AUTH']['BOT_HANDLE'])
             if tweet_response:
                 store_id(identifier, post["feed_id"])
