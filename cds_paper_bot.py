@@ -24,7 +24,7 @@ from wand.exceptions import CorruptImageError  # pylint: disable=no-name-in-modu
 import imageio
 
 # Maximum image dimension (both x and y)
-MAX_IMG_DIM = 1200
+MAX_IMG_DIM = 1000 # was 1200
 MAX_IMG_SIZE = 5242880
 # TODO: tag actual experiment?
 # TODO: add some general tags?
@@ -171,7 +171,7 @@ def process_images(identifier, downloaded_image_list, post_gif, use_wand=True, u
                     # process pdfs here only, others seem to be far too big
                     img.format = new_image_format
                     img.background_color = Color('white')
-                    img.compression_quality = 75
+                    img.compression_quality = 85 # was 75
                     filename = image_file
                     img.alpha_channel = 'remove'
                     img.trim(fuzz=0.01)
@@ -248,9 +248,9 @@ def process_images(identifier, downloaded_image_list, post_gif, use_wand=True, u
         while img_size > MAX_IMG_SIZE:
             if use_imageio:
                 imageio.mimsave('{id}/{id}.gif'.format(id=identifier), images_for_gif,
-                                format='GIF-FI', duration=1.2, quantizer='nq', palettesize=256)
+                                format='GIF-FI', duration=2, quantizer='nq', palettesize=256)
             else:
-                command = "convert -delay 120 -loop 0 "
+                command = "convert -delay 200 -loop 0 "
                 # command = "gifsicle --delay=120 --loop "
                 command += " ".join(images_for_gif)
                 command += ' {id}/{id}.gif'.format(id=identifier)
