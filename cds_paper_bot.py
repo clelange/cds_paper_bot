@@ -391,7 +391,7 @@ def split_text(type_hashtag, title, identifier, link, conf_hashtags, tweet_lengt
     while remaining_text:
         message = remaining_text.lstrip()
         allowed_length = tweet_length - length_link_and_tags
-        if not first_massage:
+        if not first_message:
             allowed_length = tweet_length - len(bot_handle) - 3
             message = bot_handle + " .." + message
         if len(message) > allowed_length:
