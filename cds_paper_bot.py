@@ -386,7 +386,7 @@ def split_text(type_hashtag, title, identifier, link, conf_hashtags, tweet_lengt
     logger.info("Splitting text ...")
     message_list = []
     length_link_and_tags = 1 + len(link) + 1 + len(conf_hashtags)
-    remaining_text = f"{type_hashtag}: {title} ({indentifier})"
+    remaining_text = f"{type_hashtag}: {title} ({identifier})"
     first_message = True
     while remaining_text:
         message = remaining_text.lstrip()
