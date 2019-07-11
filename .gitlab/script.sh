@@ -3,7 +3,6 @@
 set -e
 # echo on
 set -x
-# python cds_paper_bot.py -a "ATLAS-CONF-2019-021" -d -e "${EXPERIMENT}"
 python cds_paper_bot.py -m 1 -e "${EXPERIMENT}" --arXiv
 if [[ -n $(git status -s) ]]; then
     git checkout master
