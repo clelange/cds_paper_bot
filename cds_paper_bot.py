@@ -42,6 +42,8 @@ CADI_TO_HASHTAG['SUS'] = "#SuperSymmetry"
 CADI_TO_HASHTAG['FTR'] = "#Upgrade"
 CADI_TO_HASHTAG['SMP'] = "#StandardModel"
 CADI_TO_HASHTAG['BPH'] = "#BPhysics"
+CADI_TO_HASHTAG['JME'] = "#Jets"
+CADI_TO_HASHTAG['BTV'] = "#FlavourTagging"
 
 # identifiers for preliminary results
 PRELIM = ["CMS-PAS", "ATLAS-CONF", "LHCb-CONF"]
@@ -339,13 +341,14 @@ def upload_images(twitter, image_list, post_gif):
     logger.debug(image_ids)
     return image_ids
 
-def split_text(type_hashtag, title, identifier, link, conf_hashtags, tweet_length, bot_handle):
+def split_text(type_hashtag, title, identifier, link, conf_hashtags, phys_hashtags, tweet_length, bot_handle):
     """Split tweet into several including hashtags and URL in first one"""
     # type_hashtag: aaa bbb ccc .. link conf_hashtags
     # .. ddd eee (identifier)
     logger.info("Splitting text ...")
     message_list = []
-    length_link_and_tags = 1 + len(link) + 1 + len(conf_hashtags)
+    # add length+1 if value set
+    length_link_and_tags = sum((len(x)>0)+len(x) for x in [link, conf_hashtags, phys_hashtags])
     remaining_text = f"{type_hashtag}: {title} ({identifier})"
     first_message = True
     while remaining_text:
@@ -364,19 +367,19 @@ def split_text(type_hashtag, title, identifier, link, conf_hashtags, tweet_lengt
         else:
             remaining_text = ""
         if first_message:
-            message = " ".join(filter(None, [message, link, conf_hashtags]))
+            message = " ".join(filter(None, [message, link, conf_hashtags, phys_hashtags]))
             first_message = False
         message_list.append(message)
         logger.info("  '" + message + "'")
     return message_list
 
-def tweet(twitter, type_hashtag, title, identifier, link, conf_hashtags, image_ids, post_gif, bot_handle):
+def tweet(twitter, type_hashtag, title, identifier, link, conf_hashtags, phys_hashtags, image_ids, post_gif, bot_handle):
     """tweet the new results with title and link and pictures taking care of length limitations."""
     # type_hashtag: title (identifier) link conf_hashtags
     logger.info("Creating tweet ...")
     # https://dev.twitter.com/rest/reference/get/help/configuration
     tweet_length = 280
-    message_list = split_text(type_hashtag, title, identifier, link, conf_hashtags, tweet_length, bot_handle)
+    message_list = split_text(type_hashtag, title, identifier, link, conf_hashtags, phys_hashtags, tweet_length, bot_handle)
     first_message = True
     previous_status_id = None
     response = {}
@@ -548,10 +551,18 @@ def main():
         if not os.path.exists(outdir):
             os.makedirs(outdir)
         logger.debug("Attempting to download media.")
+        # media also includes on the physics
+        phys_hashtags = ""
         for media in media_content:
             media_url = media["url"]
             media_found = False
             media_isimage = False
+            if media_url.find("cadi?ancode=") >= 0:
+                parse_result = re.match(r".*ancode=(\w{3})-\d{2}-\d{3}", media_url)
+                if parse_result:
+                    if parse_result[1] in CADI_TO_HASHTAG:
+                        phys_hashtags = CADI_TO_HASHTAG[parse_result[1]]
+                        logger.info(f"Found physics tag: {phys_hashtags}")
             # consider only attached figures and main doc
             if experiment == "CMS":
                 # CMS follows a certain standard
@@ -686,7 +697,7 @@ def main():
         if downloaded_image_list:
             if not dry_run:
                 tweet_count += 1
-                tweet_response = tweet(twitter, type_hashtag, title_formatted, identifier, link, conf_hashtags, image_ids, post_gif, config['AUTH']['BOT_HANDLE'])
+                tweet_response = tweet(twitter, type_hashtag, title_formatted, identifier, link, conf_hashtags, phys_hashtags, image_ids, post_gif, config['AUTH']['BOT_HANDLE'])
                 # if not tweet_response:
                 #     # try to recover since something went wrong
                 #     # first, try to use individual images instead of GIF
