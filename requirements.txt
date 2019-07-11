@@ -6,3 +6,4 @@ requests==2.21.0
 Wand==0.5.1
 imageio==2.5.0
 twython==3.7.0
+lxml==4.3.3

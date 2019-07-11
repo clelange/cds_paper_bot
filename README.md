@@ -6,7 +6,7 @@ This is a Twitter bot written in python (version 3) that reads the RSS feeds of 
 
 It currently works pretty well for the ATLAS and CMS feeds listed in [`feeds.ini`](../blob/master/feeds.ini), could probably easily be extended to the LHCb and ALICE ones listed in the file already.
 
-Follow the bots on twitter [@CMSpapers](https://twitter.com/CMSpapers), [@ATLAS_results](https://twitter.com/ATLAS_results), and [@LHCb_results](https://twitter.com/LHCb_results).
+Follow the bots on twitter [@CMSpapers](https://twitter.com/CMSpapers), [@ATLASpapers](https://twitter.com/ATLASpapers)/[@ATLAS_results](https://twitter.com/ATLAS_results), and [@LHCb_results](https://twitter.com/LHCb_results).
 
 To get it to work as a bot, an `auth.ini` file containing information in the following format:
 

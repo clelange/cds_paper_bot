@@ -13,6 +13,7 @@ from pathlib import Path
 import zipfile
 import daiquiri
 import feedparser
+import lxml.html as lh
 from pylatexenc.latexwalker import LatexWalkerError
 from pylatexenc.latex2text import LatexNodes2Text
 from twython import Twython, TwythonError
@@ -22,9 +23,8 @@ from wand.image import Image, Color
 from wand.exceptions import CorruptImageError  # pylint: disable=no-name-in-module
 import imageio
 
-
 # Maximum image dimension (both x and y)
-MAX_IMG_DIM = 1200
+MAX_IMG_DIM = 1000 # was 1200
 MAX_IMG_SIZE = 5242880
 # TODO: tag actual experiment?
 # TODO: add some general tags?
@@ -42,10 +42,11 @@ CADI_TO_HASHTAG['SUS'] = "#SuperSymmetry"
 CADI_TO_HASHTAG['FTR'] = "#Upgrade"
 CADI_TO_HASHTAG['SMP'] = "#StandardModel"
 CADI_TO_HASHTAG['BPH'] = "#BPhysics"
+CADI_TO_HASHTAG['JME'] = "#Jets"
+CADI_TO_HASHTAG['BTV'] = "#FlavourTagging"
 
 # identifiers for preliminary results
 PRELIM = ["CMS-PAS", "ATLAS-CONF", "LHCb-CONF"]
-
 
 class Conference(object):
     """Define conference class for hashtag implementation."""
@@ -64,16 +65,14 @@ class Conference(object):
             return f"#{self.name}"
         return ""
 
-
 CONFERENCES = []
-CONFERENCES.append(Conference("Moriond", maya.parse(
-    f'{maya.now().year}-03-09'), maya.parse(f'{maya.now().year}-04-05')))
-
+# CONFERENCES.append(Conference("Moriond", maya.parse(f'{maya.now().year}-03-09'), maya.parse(f'{maya.now().year}-04-05')))
+CONFERENCES.append(Conference("EPSHEP2019", maya.parse("2019-07-08"), maya.parse("2019-07-17")))
+CONFERENCES.append(Conference("LeptonPhoton19", maya.parse("2019-08-03"), maya.parse("2019-10-10")))
 
 daiquiri.setup(level=logging.INFO)
 logger = daiquiri.getLogger()  # pylint: disable=invalid-name
 # imageio.plugins.freeimage.download()
-
 
 def read_feed(rss_url):
     """read the RSS feed and return dictionary"""
@@ -88,6 +87,19 @@ def read_feed(rss_url):
     feed = feedparser.parse(content)
     return feed
 
+def read_html(html_url):
+    """read the HTML page and return dictionary"""
+    try:
+        response = requests.get(html_url, timeout=10)
+    except requests.ReadTimeout:
+        logger.error("Timeout when reading HTML %s", html_url)
+        return
+    # Turn stream into memory stream object for universal feedparser
+    content = BytesIO(response.content)
+    # Parse content
+    # html = lh.fromstring(content)
+    html = lh.parse(content)
+    return html
 
 def format_title(title):
     """format the publication title"""
@@ -123,7 +135,6 @@ def format_title(title):
     text_title = re.sub(r"-+", "-", text_title)
     return text_title
 
-
 def execute_command(command):
     """execute shell command using subprocess..."""
     proc = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
@@ -138,7 +149,6 @@ def execute_command(command):
         for line in proc.stdout:
             result = result + line
         logger.debug(result)
-
 
 def process_images(identifier, downloaded_image_list, post_gif, use_wand=True, use_imageio=True):
     """Convert/resize all images to png."""
@@ -163,7 +173,7 @@ def process_images(identifier, downloaded_image_list, post_gif, use_wand=True, u
                     # process pdfs here only, others seem to be far too big
                     img.format = new_image_format
                     img.background_color = Color('white')
-                    img.compression_quality = 75
+                    img.compression_quality = 85 # was 75
                     filename = image_file
                     img.alpha_channel = 'remove'
                     img.trim(fuzz=0.01)
@@ -213,44 +223,6 @@ def process_images(identifier, downloaded_image_list, post_gif, use_wand=True, u
                         max_dim[i] = img.size[i]
                 img.save(filename=filename)
 
-    # for image_file in downloaded_image_list:
-    #     if use_wand:
-    #         # already processed non-PDF files with wand
-    #         if not image_file.endswith('pdf'):
-    #             with Image(filename="{}[0]".format(image_file)) as img:
-    #                 img.format = new_image_format
-    #                 img.background_color = Color('white')
-    #                 img.compression_quality = 75
-    #                 img.alpha_channel = 'remove'
-    #                 img.trim(fuzz=0.01)
-    #                 img.reset_coords()  # same as repage
-    #                 # resize to maximally the size of the converted PDFs
-    #                 logger.debug("img.size[0] = {}, img.size[1] = {}".format(img.size[0],
-    #                                                                          img.size[1]))
-    #                 side_to_scale = max(img.size[0], img.size[1])
-    #                 scale_factor = max(max_dim[0], max_dim[
-    #                                    1]) / float(side_to_scale)
-    #                 if scale_factor < 1:
-    #                     img.resize(
-    #                         int(img.size[0] * scale_factor), int(img.size[1] * scale_factor))
-    #                 # give the file a different name
-    #                 filesplit = image_file.rsplit(".", 1)
-    #                 filename = filesplit[0] + "_." + filesplit[1]
-    #                 # save image in list
-    #                 image_list.append(filename)
-    #                 img.save(filename=filename)
-    #     else:
-    #         # if using convert, no special treatment at the moment
-    #         command = "convert -quality 75% -trim"  # trim to get rid of whitespace
-    #         with Image(filename="{}[0]".format(image_file)) as img:  # , resolution=300
-    #             if (img.size[0] > MAX_IMG_DIM) or (img.size[1] > MAX_IMG_DIM):
-    #                 scale_factor = 100 * MAX_IMG_DIM / \
-    #                     float(max(img.size[0], img.size[1]))
-    #                 command += " -resize {}%".format(int(scale_factor))
-    #             filename = image_file.replace(".pdf", ".%s" % new_image_format)
-    #             command += "%s %s" % (image_file, filename)
-    #             execute_command(command)
-
     # bring list in order again
     image_list = sorted(image_list)
     if post_gif:
@@ -278,9 +250,9 @@ def process_images(identifier, downloaded_image_list, post_gif, use_wand=True, u
         while img_size > MAX_IMG_SIZE:
             if use_imageio:
                 imageio.mimsave('{id}/{id}.gif'.format(id=identifier), images_for_gif,
-                                format='GIF-FI', duration=1.2, quantizer='nq', palettesize=256)
+                                format='GIF-FI', duration=2, quantizer='nq', palettesize=256)
             else:
-                command = "convert -delay 120 -loop 0 "
+                command = "convert -delay 200 -loop 0 "
                 # command = "gifsicle --delay=120 --loop "
                 command += " ".join(images_for_gif)
                 command += ' {id}/{id}.gif'.format(id=identifier)
@@ -336,7 +308,6 @@ def load_config(experiment, feed_file, auth_file):
         config_dict["AUTH"][key.upper()] = config[experiment][key]
     return config_dict
 
-
 def upload_images(twitter, image_list, post_gif):
     """Upload images to twitter and return locations."""
     logger.info("Uploading images.")
@@ -370,20 +341,22 @@ def upload_images(twitter, image_list, post_gif):
     logger.debug(image_ids)
     return image_ids
 
-
-def split_text(identifier, title, hashtags_link, short_url_length, maxlength, bot_handle):
+def split_text(type_hashtag, title, identifier, link, conf_hashtags, phys_hashtags, tweet_length, bot_handle):
     """Split tweet into several including hashtags and URL in first one"""
-    logger.info("Splitting text.")
+    # type_hashtag: aaa bbb ccc .. link conf_hashtags
+    # .. ddd eee (identifier)
+    logger.info("Splitting text ...")
     message_list = []
-    remaining_text = "{}: {}".format(identifier, title)
+    # add length+1 if value set
+    length_link_and_tags = sum((len(x)>0)+len(x) for x in [link, conf_hashtags, phys_hashtags])
+    remaining_text = f"{type_hashtag}: {title} ({identifier})"
     first_message = True
     while remaining_text:
         message = remaining_text.lstrip()
-        allowed_length = short_url_length
-        if first_message:
-            allowed_length = maxlength
-        else:
-            message = ".." + message
+        allowed_length = tweet_length - length_link_and_tags
+        if not first_message:
+            allowed_length = tweet_length - len(bot_handle) - 3
+            message = bot_handle + " .." + message
         if len(message) > allowed_length:
             # strip message at last whitespace and account for 3 dots
             cut_position = message[:allowed_length - 3].rfind(" ")
@@ -394,29 +367,19 @@ def split_text(identifier, title, hashtags_link, short_url_length, maxlength, bo
         else:
             remaining_text = ""
         if first_message:
-            message = "{} {}".format(message, hashtags_link)
+            message = " ".join(filter(None, [message, link, conf_hashtags, phys_hashtags]))
             first_message = False
-        else:
-            message = bot_handle + " " + message
         message_list.append(message)
+        logger.info("  '" + message + "'")
     return message_list
 
-
-def tweet(twitter, identifier, title, link, conf_hashtags, image_ids, post_gif, bot_handle):
+def tweet(twitter, type_hashtag, title, identifier, link, conf_hashtags, phys_hashtags, image_ids, post_gif, bot_handle):
     """tweet the new results with title and link and pictures taking care of length limitations."""
-    logger.info("Creating tweet.")
+    # type_hashtag: title (identifier) link conf_hashtags
+    logger.info("Creating tweet ...")
     # https://dev.twitter.com/rest/reference/get/help/configuration
     tweet_length = 280
-    # twitter.get_twitter_configuration()['short_url_length']
-    short_url_length = len(link)
-    hashtags_link = link
-    if conf_hashtags:
-        hashtags_link = f"{conf_hashtags} {link}"
-        short_url_length = len(hashtags_link)
-    maxlength = tweet_length - short_url_length
-
-    message_list = split_text(identifier, title, hashtags_link,
-                              tweet_length, maxlength, bot_handle)
+    message_list = split_text(type_hashtag, title, identifier, link, conf_hashtags, phys_hashtags, tweet_length, bot_handle)
     first_message = True
     previous_status_id = None
     response = {}
@@ -428,8 +391,7 @@ def tweet(twitter, identifier, title, link, conf_hashtags, image_ids, post_gif, 
         if post_gif:
             if first_message:
                 try:
-                    response = twitter.update_status(
-                        status=message, media_ids=image_ids)
+                    response = twitter.update_status(status=message, media_ids=image_ids)
                 except TwythonError as twython_error:
                     print(twython_error)
                     logger.error(response)
@@ -438,8 +400,7 @@ def tweet(twitter, identifier, title, link, conf_hashtags, image_ids, post_gif, 
                 logger.debug(response)
             else:
                 try:
-                    response = twitter.update_status(status=message,
-                                                     in_reply_to_status_id=previous_status_id)
+                    response = twitter.update_status(status=message, in_reply_to_status_id=previous_status_id)
                 except TwythonError as twython_error:
                     print(twython_error)
                     logger.error(response)
@@ -447,17 +408,13 @@ def tweet(twitter, identifier, title, link, conf_hashtags, image_ids, post_gif, 
                 logger.debug(response)
         else:
             try:
-                response = twitter.update_status(status=message,
-                                                 media_ids=image_ids[
-                                                     i * 4:(i + 1) * 4],
-                                                 in_reply_to_status_id=previous_status_id)
+                response = twitter.update_status(status=message, media_ids=image_ids[i * 4:(i + 1) * 4], in_reply_to_status_id=previous_status_id)
             except TwythonError as twython_error:
                 print(twython_error)
                 logger.error(response)
                 return None
             logger.debug(response)
     return response
-
 
 def check_id_exists(identifier, feed_id):
     """Check with ID of the analysis already exists in text file to avoid tweeting again."""
@@ -471,13 +428,11 @@ def check_id_exists(identifier, feed_id):
                 return True
     return False
 
-
 def store_id(identifier, feed_id):
     """Store ID of the analysis in text file to avoid tweeting again."""
     txt_file_name = "%s.txt" % feed_id
     with open(txt_file_name, 'a') as txt_file:
         txt_file.write("%s\n" % identifier)
-
 
 def main():
     """Main function."""
@@ -557,6 +512,7 @@ def main():
     tweet_count = 0
     for post in sorted(feed_entries, key=lambda x: maya.parse(x["published"]).datetime()):
         downloaded_image_list = []
+        downloaded_doc_list = []
         logger.debug(post)
         identifier = post["dc_source"]
         # fix wrong PAS name:
@@ -569,17 +525,12 @@ def main():
             if analysis_id not in identifier:
                 continue
             else:
-                logger.info("Found %s in feed %s" %
-                            (identifier, post["feed_id"]))
+                logger.info("Found %s in feed %s" % (identifier, post["feed_id"]))
         elif check_id_exists(identifier, post["feed_id"]):
-            logger.debug("%s has already been tweeted for feed %s" %
-                         (identifier, post["feed_id"]))
+            logger.debug("%s has already been tweeted for feed %s" % (identifier, post["feed_id"]))
             continue
-        tweet_count += 1
-        logger.info("{id} - published: {date}".format(id=identifier,
-                                                      date=maya.parse(post["published"]).datetime()))
-        # if post is already in the database, skip it
-        media_content = []
+        logger.info("{id} - published: {date}".format(id=identifier, date=maya.parse(post["published"]).datetime()))
+
         arxiv_id = ""
         # try to find arXiv ID
         if identifier.startswith("arXiv"):
@@ -591,36 +542,53 @@ def main():
             if request.status_code >= 400:
                 logger.warning(f"arXiv URL {arxiv_link} seems invalid")
                 arxiv_link = None
+
+        # looking for media
+        media_content = []
         if "media_content" in post:
             media_content += post["media_content"]
         outdir = identifier.replace(':', '_')
         if not os.path.exists(outdir):
             os.makedirs(outdir)
         logger.debug("Attempting to download media.")
+        # media also includes on the physics
+        phys_hashtags = ""
         for media in media_content:
             media_url = media["url"]
-            # consider only attached Figures
+            media_found = False
+            media_isimage = False
+            if media_url.find("cadi?ancode=") >= 0:
+                parse_result = re.match(r".*ancode=(\w{3})-\d{2}-\d{3}", media_url)
+                if parse_result:
+                    if parse_result[1] in CADI_TO_HASHTAG:
+                        phys_hashtags = CADI_TO_HASHTAG[parse_result[1]]
+                        logger.info(f"Found physics tag: {phys_hashtags}")
+            # consider only attached figures and main doc
             if experiment == "CMS":
                 # CMS follows a certain standard
                 # but figures can be both PDF and PNG
-                if not re.search(r"/files\/.*[Ff]igures?_", media_url):
-                    continue
+                if re.search(r"/files\/.*[Ff]igures?_", media_url):
+                    media_found = True
+                    media_isimage = True
             elif experiment == "ATLAS":
                 # ATLAS seems to only use PNG format for plots
-                if not media_url.lower().endswith(".png"):
-                    continue
-            media_found = True
-            media_url = media_url.split("?", 1)[0]
-            logger.debug("media: " + media_url)
-            request = requests.get(media_url, timeout=10)
-            if not request.status_code < 400:
-                logger.error("media: " + media_url + " does not exist!")
-                media_found = False
-
+                if media_url.lower().endswith(".png"):
+                    media_found = True
+                    media_isimage = True
+                elif re.search(r"^" + re.escape(post.link) + "/files\/(?![Ff]ig).*\.pdf$", media_url):
+                    media_found = True
+            # check if media can be downloaded
+            if media_found:
+                media_url = media_url.split("?", 1)[0]
+                logger.debug("media: " + media_url)
+                request = requests.get(media_url, timeout=10)
+                if not request.status_code < 400:
+                    logger.error("media: " + media_url + " does not exist!")
+                    media_found = False
+            # download and categorise media
             if media_found:
                 # download images
-                out_path = "{}/{}".format(outdir,
-                                          media_url.rsplit("/", 1)[1])
+                out_path = "{}/{}".format(outdir, media_url.rsplit("/", 1)[1])
                 request = requests.get(media_url, stream=True)
                 if request.status_code == 200:
                     with open(out_path, 'wb') as file_handler:
@@ -628,7 +596,45 @@ def main():
                         shutil.copyfileobj(request.raw, file_handler)
                     if out_path.find("%") >= 0:
                         continue
-                    downloaded_image_list.append(out_path)
+                    if media_isimage:
+                        downloaded_image_list.append(out_path)
+                        logger.debug("image: " + out_path + " downloaded!")
+                    else:
+                        downloaded_doc_list.append(out_path)
+                        logger.debug("doc: " + out_path + " downloaded!")
+
+        # ATLAS notes workaround
+        if experiment == "ATLAS" and len(downloaded_image_list) == 0:
+            confnotepageurl = "https://atlas.web.cern.ch/Atlas/GROUPS/PHYSICS/CONFNOTES/" + identifier + "/"
+            linkedimages = read_html(confnotepageurl).xpath('//a[img]/@href')
+            for image in linkedimages:
+                # ATLAS only uses PNG format for plots
+                if not image.lower().endswith(".png"):
+                    continue
+                # skip tables and aux for this purpose
+                if image.lower().startswith("tab") or "aux" in image.lower():
+                    continue
+                # now this part is (for now) just a copy-n-paste from above (sorry about that)
+                media_found = True
+                media_url = confnotepageurl + image
+                logger.debug("media: " + media_url)
+                request = requests.get(media_url, timeout=10)
+                if not request.status_code < 400:
+                    logger.error("media: " + media_url + " does not exist!")
+                    media_found = False
+
+                if media_found:
+                    # download images
+                    out_path = "{}/{}".format(outdir, media_url.rsplit("/", 1)[1])
+                    request = requests.get(media_url, stream=True)
+                    if request.status_code == 200:
+                        with open(out_path, 'wb') as file_handler:
+                            request.raw.decode_content = True
+                            shutil.copyfileobj(request.raw, file_handler)
+                        if out_path.find("%") >= 0:
+                            continue
+                        downloaded_image_list.append(out_path)
+
         # if there's a zip file and only one PDF, the figures are probably in the zip file
         if any(".zip" in s for s in downloaded_image_list):
             logger.info("using zip file instead of images")
@@ -647,10 +653,10 @@ def main():
                        (img_path.find("__MACOSX") >= 0) or
                        (img_path.rsplit("/", 1)[1].startswith("."))):
                     downloaded_image_list.append(img_path)
+
         image_ids = []
         if downloaded_image_list:
-            image_list = process_images(
-                outdir, downloaded_image_list, post_gif)
+            image_list = process_images(outdir, downloaded_image_list, post_gif)
             image_ids = upload_images(twitter, image_list, post_gif)
 
         title = post.title
@@ -663,47 +669,58 @@ def main():
             if identifier.find(item) >= 0:
                 prelim_result = True
                 logger.info("This is a preliminary result.")
+
         conf_hashtags = ""
         # use only for PAS/CONF notes:
         if prelim_result:
             conf_hashtags = " ".join(filter(None, (conf.is_now(
                 post["published"]) for conf in CONFERENCES)))
             logger.info(f"Conference hashtags: {conf_hashtags}")
+
+        type_hashtag = "New result"
+        if prelim_result:
+            if experiment == "CMS":
+                type_hashtag = "#CMSPAS"
+            else:
+                type_hashtag = f"#{experiment}conf"
+        else:
+            type_hashtag = f"#{experiment}paper"
+
         title_formatted = format_title(title)
         if sys.version_info[0] < 3:
             title_formatted = title_formatted.encode('utf8')
-        logger.info("{}: {} {}".format(
-            identifier, title_formatted, " ".join(filter(None, [conf_hashtags, link]))))
-        if not dry_run:
-            tweet_response = tweet(twitter, identifier, title_formatted, link, conf_hashtags,
-                                   image_ids, post_gif, config['AUTH']['BOT_HANDLE'])
-            if not tweet_response:
-                # try to recover since something went wrong
-                # first, try to use individual images instead of GIF
-                if post_gif:
-                    if downloaded_image_list:
-                        logger.info("Trying to tweet without GIF")
-                        image_list = process_images(
-                            outdir, downloaded_image_list, post_gif=False)
-                        image_ids = upload_images(
-                            twitter, image_list, post_gif=False)
-                        tweet_response = tweet(
-                            twitter, identifier, title_formatted, link, conf_hashtags, image_ids,
-                            post_gif=False, bot_handle=config['AUTH']['BOT_HANDLE'])
-            if not tweet_response:
-                # second, try to tweet without image
-                logger.info("Trying to tweet without images")
-                tweet_response = tweet(
-                    twitter, identifier, title_formatted, link, conf_hashtags, image_ids=[],
-                    post_gif=False, bot_handle=config['AUTH']['BOT_HANDLE'])
-            if tweet_response:
-                store_id(identifier, post["feed_id"])
+
+        # title_temp = type_hashtag + ": " + title_formatted + " (" + identifier + ") " + link + " " + conf_hashtags
+        # logger.info(title_temp)
+
+        # skip entries without media
+        if downloaded_image_list:
+            if not dry_run:
+                tweet_count += 1
+                tweet_response = tweet(twitter, type_hashtag, title_formatted, identifier, link, conf_hashtags, phys_hashtags, image_ids, post_gif, config['AUTH']['BOT_HANDLE'])
+                # if not tweet_response:
+                #     # try to recover since something went wrong
+                #     # first, try to use individual images instead of GIF
+                #     if post_gif:
+                #         if downloaded_image_list:
+                #             logger.info("Trying to tweet without GIF")
+                #             image_list = process_images(outdir, downloaded_image_list, post_gif=False)
+                #             image_ids = upload_images(twitter, image_list, post_gif=False)
+                #             tweet_response = tweet(twitter, type_hashtag, title_formatted, identifier, link, conf_hashtags, image_ids, post_gif=False, bot_handle=config['AUTH']['BOT_HANDLE'])
+                # if not tweet_response:
+                #     # second, try to tweet without image
+                #     logger.info("Trying to tweet without images")
+                #     tweet_response = tweet(twitter, type_hashtag, title_formatted, identifier, link, conf_hashtags, image_ids=[], post_gif=False, bot_handle=config['AUTH']['BOT_HANDLE'])
+                if tweet_response:
+                    store_id(identifier, post["feed_id"])
+        else:
+            logger.info("No media found! Skipping entry.")
+
         if not keep_image_dir:
             # clean up images
             shutil.rmtree(outdir)
         if tweet_count >= max_tweets:
             return
-
 
 if __name__ == '__main__':
     main()
