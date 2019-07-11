@@ -666,12 +666,14 @@ def main():
                 post["published"]) for conf in CONFERENCES)))
             logger.info(f"Conference hashtags: {conf_hashtags}")
 
-        type_hashtag = "publication"
-        if experiment == "ATLAS":
-            if prelim_result:
-                type_hashtag = "#ATLASconf"
+        type_hashtag = "New result"
+        if prelim_result:
+            if experiment == "CMS":
+                type_hashtag = "#CMSPAS"
             else:
-                type_hashtag = "#ATLASpaper"
+                type_hashtag = f"#{experiment}conf"
+        else:
+            type_hashtag = f"#{experiment}paper"
 
         title_formatted = format_title(title)
         if sys.version_info[0] < 3:
