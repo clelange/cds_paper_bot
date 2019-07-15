@@ -699,24 +699,24 @@ def main():
         # title_temp = type_hashtag + ": " + title_formatted + " (" + identifier + ") " + link + " " + conf_hashtags
         # logger.info(title_temp)
 
-        # skip entries without media
-        if downloaded_image_list:
+        # skip entries without media for ATLAS
+        if downloaded_image_list or experiment != "ATLAS":
             if not dry_run:
                 tweet_count += 1
                 tweet_response = tweet(twitter, type_hashtag, title_formatted, identifier, link, conf_hashtags, phys_hashtags, image_ids, post_gif, config['AUTH']['BOT_HANDLE'])
-                # if not tweet_response:
-                #     # try to recover since something went wrong
-                #     # first, try to use individual images instead of GIF
-                #     if post_gif:
-                #         if downloaded_image_list:
-                #             logger.info("Trying to tweet without GIF")
-                #             image_list = process_images(outdir, downloaded_image_list, post_gif=False)
-                #             image_ids = upload_images(twitter, image_list, post_gif=False)
-                #             tweet_response = tweet(twitter, type_hashtag, title_formatted, identifier, link, conf_hashtags, image_ids, post_gif=False, bot_handle=config['AUTH']['BOT_HANDLE'])
-                # if not tweet_response:
-                #     # second, try to tweet without image
-                #     logger.info("Trying to tweet without images")
-                #     tweet_response = tweet(twitter, type_hashtag, title_formatted, identifier, link, conf_hashtags, image_ids=[], post_gif=False, bot_handle=config['AUTH']['BOT_HANDLE'])
+                if not tweet_response:
+                    # try to recover since something went wrong
+                    # first, try to use individual images instead of GIF
+                    if post_gif:
+                        if downloaded_image_list:
+                            logger.info("Trying to tweet without GIF")
+                            image_list = process_images(outdir, downloaded_image_list, post_gif=False)
+                            image_ids = upload_images(twitter, image_list, post_gif=False)
+                            tweet_response = tweet(twitter, type_hashtag, title_formatted, identifier, link, conf_hashtags, image_ids, post_gif=False, bot_handle=config['AUTH']['BOT_HANDLE'])
+                if not tweet_response:
+                    # second, try to tweet without image
+                    logger.info("Trying to tweet without images")
+                    tweet_response = tweet(twitter, type_hashtag, title_formatted, identifier, link, conf_hashtags, image_ids=[], post_gif=False, bot_handle=config['AUTH']['BOT_HANDLE'])
                 if tweet_response:
                     store_id(identifier, post["feed_id"])
         else:
