@@ -685,6 +685,12 @@ def main():
                 type_hashtag = f"#{experiment}conf"
         else:
             type_hashtag = f"#{experiment}paper"
+            # For initial submission to arXiv there won't be any pictures,
+            # but the submission happens days before the analysis appears on arXiv
+            # while the CDS entry with the arXiv identifier comes after the
+            # availability on arXiv, so let's give people a heads-up of what's coming.
+            if experiment == "CMS" and identifier.startswith('CERN-EP'):
+                type_hashtag += " soon on arXiv"
 
         title_formatted = format_title(title)
         if sys.version_info[0] < 3:
