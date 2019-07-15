@@ -685,6 +685,12 @@ def main():
                 type_hashtag = f"#{experiment}conf"
         else:
             type_hashtag = f"#{experiment}paper"
+            # For initial submission to arXiv there won't be any pictures,
+            # but the submission happens days before the analysis appears on arXiv
+            # while the CDS entry with the arXiv identifier comes after the
+            # availability on arXiv, so let's give people a heads-up of what's coming.
+            if experiment == "CMS" and identifier.startswith('CERN-EP'):
+                type_hashtag += " soon on arXiv"
 
         title_formatted = format_title(title)
         if sys.version_info[0] < 3:
@@ -693,24 +699,24 @@ def main():
         # title_temp = type_hashtag + ": " + title_formatted + " (" + identifier + ") " + link + " " + conf_hashtags
         # logger.info(title_temp)
 
-        # skip entries without media
-        if downloaded_image_list:
+        # skip entries without media for ATLAS
+        if downloaded_image_list or experiment != "ATLAS":
             if not dry_run:
                 tweet_count += 1
                 tweet_response = tweet(twitter, type_hashtag, title_formatted, identifier, link, conf_hashtags, phys_hashtags, image_ids, post_gif, config['AUTH']['BOT_HANDLE'])
-                # if not tweet_response:
-                #     # try to recover since something went wrong
-                #     # first, try to use individual images instead of GIF
-                #     if post_gif:
-                #         if downloaded_image_list:
-                #             logger.info("Trying to tweet without GIF")
-                #             image_list = process_images(outdir, downloaded_image_list, post_gif=False)
-                #             image_ids = upload_images(twitter, image_list, post_gif=False)
-                #             tweet_response = tweet(twitter, type_hashtag, title_formatted, identifier, link, conf_hashtags, image_ids, post_gif=False, bot_handle=config['AUTH']['BOT_HANDLE'])
-                # if not tweet_response:
-                #     # second, try to tweet without image
-                #     logger.info("Trying to tweet without images")
-                #     tweet_response = tweet(twitter, type_hashtag, title_formatted, identifier, link, conf_hashtags, image_ids=[], post_gif=False, bot_handle=config['AUTH']['BOT_HANDLE'])
+                if not tweet_response:
+                    # try to recover since something went wrong
+                    # first, try to use individual images instead of GIF
+                    if post_gif:
+                        if downloaded_image_list:
+                            logger.info("Trying to tweet without GIF")
+                            image_list = process_images(outdir, downloaded_image_list, post_gif=False)
+                            image_ids = upload_images(twitter, image_list, post_gif=False)
+                            tweet_response = tweet(twitter, type_hashtag, title_formatted, identifier, link, conf_hashtags, image_ids, post_gif=False, bot_handle=config['AUTH']['BOT_HANDLE'])
+                if not tweet_response:
+                    # second, try to tweet without image
+                    logger.info("Trying to tweet without images")
+                    tweet_response = tweet(twitter, type_hashtag, title_formatted, identifier, link, conf_hashtags, image_ids=[], post_gif=False, bot_handle=config['AUTH']['BOT_HANDLE'])
                 if tweet_response:
                     store_id(identifier, post["feed_id"])
         else:
