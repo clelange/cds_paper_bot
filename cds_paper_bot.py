@@ -27,7 +27,6 @@ import imageio
 MAX_IMG_DIM = 1000 # was 1200
 MAX_IMG_SIZE = 5242880
 # TODO: tag actual experiment?
-# TODO: add some general tags?
 # TODO: Make certain keywords tags
 # collection could be: Higgs, NewPhysics, 13TeV/8TeV, StandardModel,
 # resonances, DarkMatter, SUSY, BSM
@@ -71,6 +70,7 @@ CONFERENCES.append(Conference("EPSHEP2019", maya.parse("2019-07-08"), maya.parse
 CONFERENCES.append(Conference("LeptonPhoton19", maya.parse("2019-08-03"), maya.parse("2019-08-10")))
 CONFERENCES.append(Conference("topq2019", maya.parse("2019-09-20"), maya.parse("2019-09-28")))
 CONFERENCES.append(Conference("HiggsCouplings", maya.parse("2019-09-29"), maya.parse("2019-10-06")))
+CONFERENCES.append(Conference("QM2019", maya.parse("2019-11-01"), maya.parse("2019-11-12")))
 
 daiquiri.setup(level=logging.INFO)
 logger = daiquiri.getLogger()  # pylint: disable=invalid-name
