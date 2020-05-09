@@ -29,8 +29,108 @@ class TestFormatTitle(object):
             ("nonsenseTeV", "nonsenseTeV"),
             ("13tev", "13tev"),
             ("50eV", "50 eV"),
-            # pylint: disable=line-too-long
+            # pylint: disable=line-too-long,too-many-lines
             # CMS cms_pas_feed
+            (
+                "Measurement of differential ${\\mathrm t}\\bar{\\mathrm t}$ production cross sections for high-$p_{\\text{T}}$ top quarks in proton-proton collisions at $\\sqrt{s} = 13\\,\\text{TeV}$",
+                "Measurement of differential tt̅ production cross sections for high-p_T top quarks in proton-proton collisions at √(s) = 13 TeV",
+            ),
+            (
+                "Search for long-lived particles decaying into displaced jets",
+                "Search for long-lived particles decaying into displaced jets",
+            ),
+            (
+                "Study of hard color singlet exchange in dijet events with proton-proton collisions at $\\sqrt{s}= 13~\\mathrm{TeV}$",
+                "Study of hard color singlet exchange in dijet events with proton-proton collisions at √(s) = 13 TeV",
+            ),
+            (
+                "Inclusive search for a highly boosted Higgs boson decaying to a bottom quark-antiquark pair at $\\sqrt{s} = 13~\\mathrm{TeV}$ with $137~\\mathrm{fb}^{-1}$",
+                "Inclusive search for a highly boosted Higgs boson decaying to a bottom quark-antiquark pair at √(s) = 13 TeV with 137 fb^-1",
+            ),
+            (
+                "Observation of heavy triboson production in leptonic final states in proton-proton collisions at $\\sqrt{s}=13~\\mathrm{TeV}$",
+                "Observation of heavy triboson production in leptonic final states in proton-proton collisions at √(s) = 13 TeV",
+            ),
+            (
+                "Studies of $\\mathrm{W^+W^-}$ production at $\\sqrt{s}=13~\\mathrm{TeV}$",
+                "Studies of W^+W^- production at √(s) = 13 TeV",
+            ),
+            (
+                "Measurement of the $CP$ violating phase $\\phi_{\\text{s}}$ in the $\\mathrm{B}_s \\to \\mathrm{J}/\\psi\\,\\phi(1020) \\to \\mu^+\\mu^-\\,\\mathrm{K}^+\\mathrm{K}^-$ channel in proton-proton collisions at $\\sqrt{s} = 13~\\mathrm{TeV}$",
+                "Measurement of the CP violating phase ϕ_s in the B_s → J/ψ ϕ(1020) → μ^+μ^- K^+K^- channel in proton-proton collisions at √(s) = 13 TeV",
+            ),
+            (
+                "Measurements of production cross sections of same-sign WW and WZ boson pairs in association with two jets in proton-proton collisions at sqrts = 13 TeV",
+                "Measurements of production cross sections of same-sign WW and WZ boson pairs in association with two jets in proton-proton collisions at √(s) = 13 TeV",
+            ),
+            (
+                "Measurement of differential cross sections for single top quark production in association with a W boson at $\\sqrt{s}=13~\\mathrm{TeV}$",
+                "Measurement of differential cross sections for single top quark production in association with a W boson at √(s) = 13 TeV",
+            ),
+            (
+                "Measurement of the W boson rapidity, helicity, and differential cross sections in pp collisions at $\\sqrt{s}=13~\\mathrm{TeV}$",
+                "Measurement of the W boson rapidity, helicity, and differential cross sections in pp collisions at √(s) = 13 TeV",
+            ),
+            (
+                "Search for disappearing tracks in proton-proton collisions at $\\sqrt{s} = 13$ TeV",
+                "Search for disappearing tracks in proton-proton collisions at √(s) = 13 TeV",
+            ),
+            (
+                "Combined Higgs boson production and decay measurements with up to 137 fb-1 of proton-proton collision data at sqrts = 13 TeV",
+                "Combined Higgs boson production and decay measurements with up to 137 fb-1 of proton-proton collision data at √(s) = 13 TeV",
+            ),
+            (
+                "Search for a light charged Higgs boson in the H$^{\\pm} \\rightarrow$ cs channel at 13 TeV",
+                "Search for a light charged Higgs boson in the H^± → cs channel at 13 TeV",
+            ),
+            (
+                "Measurement of prompt $\\rm{ D_{s}^{+}}$ production in pp and PbPb collisions at $\\sqrt{s_{_{\\text{NN}}}}$ = 5.02 TeV",
+                "Measurement of prompt D_s^+ production in pp and PbPb collisions at √(s_NN) = 5.02 TeV",
+            ),
+            (
+                "Extraction of CKM matrix elements in single top quark $t$-channel events in proton-proton collisions at $\\sqrt{s} = 13$ TeV",
+                "Extraction of CKM matrix elements in single top quark t-channel events in proton-proton collisions at √(s) = 13 TeV",
+            ),
+            (
+                "Nuclear modification factor of isolated photons in PbPb collisions at $\\sqrt{s_{_{\\mathrm{NN}}}} = 5.02~\\mathrm{TeV}$",
+                "Nuclear modification factor of isolated photons in PbPb collisions at √(s_NN) = 5.02 TeV",
+            ),
+            (
+                "Nuclear modification of $\\Upsilon$ states in pPb collisions at $\\sqrt{s_\\mathrm{NN}} = 5.02~\\mathrm{TeV}$",
+                "Nuclear modification of Υ states in pPb collisions at √(s_NN) = 5.02 TeV",
+            ),
+            (
+                "Search for strong electromagnetic fields in PbPb collisions at 5.02 TeV via azimuthal anisotropy of $\\mathrm{D^0}$ and $\\mathrm{\\overline{D}^0}$ mesons",
+                "Search for strong electromagnetic fields in PbPb collisions at 5.02 TeV via azimuthal anisotropy of D^0 and D^0 mesons",
+            ),
+            (
+                "Studies of charm and beauty long-range correlations in pp and pPb collisions",
+                "Studies of charm and beauty long-range correlations in pp and pPb collisions",
+            ),
+            (
+                "Evidence for top quark production in nucleus-nucleus collisions",
+                "Evidence for top quark production in nucleus-nucleus collisions",
+            ),
+            (
+                "Evidence for $\\chi_{c1}$(3872) in PbPb collisions and studies of its prompt production at $\\sqrt{\\smash[b]{s_{_{\\mathrm{NN}}}}}=5.02$ TeV",
+                "Evidence for χ_c1(3872) in PbPb collisions and studies of its prompt production at √(s_NN) = 5.02 TeV",
+            ),
+            (
+                "Study of quark- and gluon-like jet fractions using jet charge in PbPb and pp collisions at 5.02 TeV",
+                "Study of quark- and gluon-like jet fractions using jet charge in PbPb and pp collisions at 5.02 TeV",
+            ),
+            (
+                "Measurement of the elliptic flow of $\\Upsilon\\textrm{(1S)}$ and $\\Upsilon\\textrm{(2S)}$ mesons in PbPb collisions at $\\sqrt{\\mathrm{s_{NN}}}=5.02~\\mathrm{TeV}$",
+                "Measurement of the elliptic flow of Υ(1S) and Υ(2S) mesons in PbPb collisions at √(s_NN) = 5.02 TeV",
+            ),
+            (
+                "Measurement of Jet Nuclear Modification Factor in PbPb Collisions at $\\sqrt{s_{NN}}$ = 5.02 TeV with CMS",
+                "Measurement of Jet Nuclear Modification Factor in PbPb Collisions at √(s_NN) = 5.02 TeV with CMS",
+            ),
+            (
+                "Measurement of $\\mathrm{b}$ jet shapes in pp collisions at $\\sqrt{s} = 5.02~\\mathrm{TeV}$",
+                "Measurement of b jet shapes in pp collisions at √(s) = 5.02 TeV",
+            ),
             (
                 "Measurement of the average very forward energy as a function of the track multiplicity at central rapidities in proton-proton collisions at $\\sqrt{s}=13~\\mathrm{TeV}$",
                 "Measurement of the average very forward energy as a function of the track multiplicity at central rapidities in proton-proton collisions at √(s) = 13 TeV",
@@ -132,6 +232,106 @@ class TestFormatTitle(object):
                 "Search for a charged Higgs boson decaying into top and bottom quarks in proton-proton collisions at 13 TeV in events with electrons or muons",
             ),
             # CMS cms_paper_feed
+            (
+                "Combination of the W boson polarization measurements in top quark decays using ATLAS and CMS data at $\\sqrt{s} = $ 8 TeV",
+                "Combination of the W boson polarization measurements in top quark decays using ATLAS and CMS data at √(s) = 8 TeV",
+            ),
+            (
+                "Measurements of production cross sections of WZ and same-sign WW boson pairs in association with two jets in proton-proton collisions at $\\sqrt{s} = $ 13 TeV",
+                "Measurements of production cross sections of WZ and same-sign WW boson pairs in association with two jets in proton-proton collisions at √(s) = 13 TeV",
+            ),
+            (
+                "Measurement of CKM matrix elements in single top quark $t$-channel production in proton-proton collisions at $\\sqrt{s} = $ 13 TeV",
+                "Measurement of CKM matrix elements in single top quark t-channel production in proton-proton collisions at √(s) = 13 TeV",
+            ),
+            (
+                "Identification of heavy, energetic, hadronically decaying particles using machine-learning techniques",
+                "Identification of heavy, energetic, hadronically decaying particles using machine-learning techniques",
+            ),
+            (
+                "Search for disappearing tracks in proton-proton collisions at $\\sqrt{s} = $ 13 TeV",
+                "Search for disappearing tracks in proton-proton collisions at √(s) = 13 TeV",
+            ),
+            (
+                "Measurement of quark- and gluon-like jet fractions using jet charge in PbPb and pp collisions at 5.02 TeV",
+                "Measurement of quark- and gluon-like jet fractions using jet charge in PbPb and pp collisions at 5.02 TeV",
+            ),
+            (
+                "The production of isolated photons in PbPb and pp collisions at ${\\sqrt {\\smash [b]{s_{_{\\mathrm {NN}}}}}} = $ 5.02 TeV",
+                "The production of isolated photons in PbPb and pp collisions at √(s_NN) = 5.02 TeV",
+            ),
+            (
+                "Measurements of ${\\mathrm{t\\bar{t}}\\mathrm{H}} $ production and the CP structure of the Yukawa interaction between the Higgs boson and top quark in the diphoton decay channel",
+                "Measurements of tt̅H production and the CP structure of the Yukawa interaction between the Higgs boson and top quark in the diphoton decay channel",
+            ),
+            (
+                "Measurement of the cross section for $\\mathrm{t\\bar{t}}$ production with additional jets and b jets in pp collisions at $\\sqrt{s} = $ 13 TeV",
+                "Measurement of the cross section for tt̅ production with additional jets and b jets in pp collisions at √(s) = 13 TeV",
+            ),
+            (
+                "Study of central exclusive $\\pi^{+}\\pi^{-}$ production in proton-proton collisions at $\\sqrt{s} = $ 5.02 and 13 TeV",
+                "Study of central exclusive π^+π^- production in proton-proton collisions at √(s) = 5.02 and 13 TeV",
+            ),
+            (
+                "Pileup mitigation at CMS in 13 TeV data",
+                "Pileup mitigation at CMS in 13 TeV data",
+            ),
+            (
+                "Measurement of single-diffractive dijet production in proton-proton collisions at $\\sqrt{s} =$ 8 TeV with the CMS and TOTEM experiments",
+                "Measurement of single-diffractive dijet production in proton-proton collisions at √(s) = 8 TeV with the CMS and TOTEM experiments",
+            ),
+            (
+                "Measurement of the cross section for electroweak production of a Z boson, a photon and two jets in proton-proton collisions at $\\sqrt{s} = $ 13 TeV and constraints on anomalous quartic couplings",
+                "Measurement of the cross section for electroweak production of a Z boson, a photon and two jets in proton-proton collisions at √(s) = 13 TeV and constraints on anomalous quartic couplings",
+            ),
+            (
+                "A measurement of the Higgs boson mass in the diphoton decay channel",
+                "A measurement of the Higgs boson mass in the diphoton decay channel",
+            ),
+            (
+                "Measurement of the $\\Upsilon(\\text{1S}) $ pair production cross section and search for resonances decaying to $\\Upsilon(\\text{1S}) \\mu^{+}\\mu^{-}$ in proton-proton collisions at $\\sqrt{s} = $ 13 TeV",
+                "Measurement of the Υ(1S) pair production cross section and search for resonances decaying to Υ(1S) μ^+μ^- in proton-proton collisions at √(s) = 13 TeV",
+            ),
+            (
+                "Search for physics beyond the standard model in events with jets and two same-sign or at least three charged leptons in proton-proton collisions at $\\sqrt{s}=$ 13 TeV",
+                "Search for physics beyond the standard model in events with jets and two same-sign or at least three charged leptons in proton-proton collisions at √(s) = 13 TeV",
+            ),
+            (
+                "Search for charged Higgs bosons decaying into a top and a bottom quark in the all-jet final state of pp collisions at $\\sqrt{s}=$ 13 TeV",
+                "Search for charged Higgs bosons decaying into a top and a bottom quark in the all-jet final state of pp collisions at √(s) = 13 TeV",
+            ),
+            (
+                "Measurement of the associated production of a Z boson with charm or bottom quark jets in proton-proton collisions at $\\sqrt{s}=$ 13 TeV",
+                "Measurement of the associated production of a Z boson with charm or bottom quark jets in proton-proton collisions at √(s) = 13 TeV",
+            ),
+            (
+                "Measurements of dose-rate effects in the radiation damage of plastic scintillator tiles using silicon photomultipliers",
+                "Measurements of dose-rate effects in the radiation damage of plastic scintillator tiles using silicon photomultipliers",
+            ),
+            (
+                "Study of excited $\\Lambda_{\\mathrm{b}}^{0}$ states decaying to $\\Lambda_{\\mathrm{b}}^{0}\\pi^{+}\\pi^{-}$ in proton-proton collisions at $\\sqrt{s} = $ 13 TeV",
+                "Study of excited Λ_b^0 states decaying to Λ_b^0π^+π^- in proton-proton collisions at √(s) = 13 TeV",
+            ),
+            (
+                "Search for an excited lepton that decays via a contact interaction to a lepton and two jets in proton-proton collisions at ${\\sqrt{s}} = $ 13 TeV",
+                "Search for an excited lepton that decays via a contact interaction to a lepton and two jets in proton-proton collisions at √(s) = 13 TeV",
+            ),
+            (
+                "A deep neural network to search for new long-lived particles decaying to jets",
+                "A deep neural network to search for new long-lived particles decaying to jets",
+            ),
+            (
+                "Measurement of the top quark forward-backward production asymmetry and the anomalous chromoelectric and chromomagnetic moments in pp collisions at $\\sqrt{s} = $ 13 TeV",
+                "Measurement of the top quark forward-backward production asymmetry and the anomalous chromoelectric and chromomagnetic moments in pp collisions at √(s) = 13 TeV",
+            ),
+            (
+                "Search for direct top squark pair production in events with one lepton, jets, and missing transverse momentum at 13 TeV with the CMS experiment",
+                "Search for direct top squark pair production in events with one lepton, jets, and missing transverse momentum at 13 TeV with the CMS experiment",
+            ),
+            (
+                "Measurement of the ${\\chi_{\\mathrm{c}1}}$ and ${\\chi_{\\mathrm{c}2}}$ polarizations in proton-proton collisions at $\\sqrt{s} = $ 8 TeV",
+                "Measurement of the χ_c1 and χ_c2 polarizations in proton-proton collisions at √(s) = 8 TeV",
+            ),
             (
                 "Extraction and validation of a new set of CMS PYTHIA-8 tunes from underlying-event measurements",
                 "Extraction and validation of a new set of CMS PYTHIA-8 tunes from underlying-event measurements",
