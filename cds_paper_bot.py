@@ -84,6 +84,12 @@ CONFERENCES.append(
 CONFERENCES.append(
     Conference("QM2019", maya.parse("2019-11-01"), maya.parse("2019-11-12"))
 )
+CONFERENCES.append(
+    Conference("LHCP2020", maya.parse("2020-05-18"), maya.parse("2020-06-06"))
+)
+CONFERENCES.append(
+    Conference("ICHEP2020", maya.parse("2020-07-21"), maya.parse("2020-08-13"))
+)
 
 daiquiri.setup(level=logging.INFO)
 logger = daiquiri.getLogger()  # pylint: disable=invalid-name
