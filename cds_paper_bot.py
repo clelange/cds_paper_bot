@@ -125,6 +125,69 @@ def read_html(html_url):
     return html
 
 
+def convert_to_unicode(text):
+    """Convert some standard sub- and superscripts to unicode."""
+    # Check https://github.com/svenkreiss/unicodeit in the long run
+    unicode_text = text
+    unicode_text = unicode_text.replace("_S^0", "⁰_S ")
+    unicode_text = unicode_text.replace("^0_S", "⁰_S ")
+    # s quarks
+    unicode_text = unicode_text.replace("_(s)^0", "⁰_s ")
+    unicode_text = unicode_text.replace("^0_(s)", "⁰_s ")
+    unicode_text = unicode_text.replace("_s^*±", "*^±_s ")
+    unicode_text = unicode_text.replace("_s^0", "⁰_s ")
+    unicode_text = unicode_text.replace("^0_s", "⁰_s ")
+    unicode_text = unicode_text.replace("_s^+", "⁺_s ")
+    unicode_text = unicode_text.replace("^+_s", "⁺_s ")
+    unicode_text = unicode_text.replace("_s^-", "⁻_s ")
+    unicode_text = unicode_text.replace("^-_s", "⁻_s ")
+    unicode_text = unicode_text.replace("_s^±", "^±_s ")
+    # b quarks
+    unicode_text = unicode_text.replace("_b^*±", "*^±_b ")
+    unicode_text = unicode_text.replace("_b^0", "⁰_b ")
+    unicode_text = unicode_text.replace("^0_b", "⁰_b ")
+    unicode_text = unicode_text.replace("_b^+", "⁺_b ")
+    unicode_text = unicode_text.replace("^+_b", "⁺_b ")
+    unicode_text = unicode_text.replace("_b^-", "⁻_b ")
+    unicode_text = unicode_text.replace("^-_b", "⁻_b ")
+    unicode_text = unicode_text.replace("_b^±", "^±_b ")
+    # c quarks
+    unicode_text = unicode_text.replace("_c^*±", "*^±_c ")
+    unicode_text = unicode_text.replace("_c^0", "⁰_c ")
+    unicode_text = unicode_text.replace("^0_c", "⁰_c ")
+    unicode_text = unicode_text.replace("_c^+", "⁺_c ")
+    unicode_text = unicode_text.replace("^+_c", "⁺_c ")
+    unicode_text = unicode_text.replace("_c^-", "⁻_c ")
+    unicode_text = unicode_text.replace("^-_c", "⁻_c ")
+    unicode_text = unicode_text.replace("_c^±", "^±_c ")
+    # more complicated combinations
+    unicode_text = unicode_text.replace("_cc^+", "⁺_cc ")
+    unicode_text = unicode_text.replace("(770)^0", "⁰(770)")
+    unicode_text = unicode_text.replace("(892)^0", "⁰(892)")
+    unicode_text = unicode_text.replace("_c(4312)^+", "⁺_c(4312)")
+    unicode_text = unicode_text.replace("_c(4450)^+", "⁺_c(4450)")
+    unicode_text = unicode_text.replace("^-1", "⁻¹")
+    unicode_text = unicode_text.replace("^-2", "⁻²")
+    unicode_text = unicode_text.replace("^∗+", "*⁺")
+    unicode_text = unicode_text.replace("^+*", "⁺*")
+    unicode_text = unicode_text.replace("^∗-", "*⁻")
+    unicode_text = unicode_text.replace("^-*", "⁻*")
+    unicode_text = unicode_text.replace("^∗0", "*⁰")
+    unicode_text = unicode_text.replace("^0*", "⁰*")
+    unicode_text = unicode_text.replace("^*0", "*⁰")
+    unicode_text = unicode_text.replace("^*±", "*^±")
+    unicode_text = unicode_text.replace("^++", "⁺⁺")
+    unicode_text = unicode_text.replace("^+", "⁺")
+    unicode_text = unicode_text.replace("^--", "⁻⁻")
+    unicode_text = unicode_text.replace("^-", "⁻")
+    unicode_text = unicode_text.replace("_-", "₊")
+    unicode_text = unicode_text.replace("_-", "₋")
+    unicode_text = unicode_text.replace("^0", "⁰")
+    unicode_text = unicode_text.replace("_0", "₀")
+    unicode_text = unicode_text.replace("^*", "*")
+    return unicode_text
+
+
 def format_title(title):
     """format the publication title"""
     logger.info("Formatting title.")
@@ -135,6 +198,9 @@ def format_title(title):
     title = title.replace("\\smash[b]", "")
     title = title.replace("\\smash [b]", "")
     title = title.replace("\\mbox{", "{")
+    title = title.replace("{\\rm ", "{")
+    title = title.replace("{\\rm\\scriptscriptstyle ", "{")
+    title = title.replace("\\kern -0.1em ", "")
     title = title.replace("$~\\mathrm{", "~$\\mathrm{")
     if re.search(r"rightarrow\S", title):
         title = title.replace("rightarrow", "rightarrow ")
@@ -145,12 +211,16 @@ def format_title(title):
             f"overline {overline.group(1)}", "overline{%s}" % overline.group(1)
         )
     title = title.replace(" \\overline{", "\\overline{")
+    # overline{D} gives problems when in mathrm
+    title = title.replace("\\overline{D", "\\bar{D")
     try:
         text_title = LatexNodes2Text().latex_to_text(title)
     except LatexWalkerError as identifier:
         logger.error(identifier)
         text_title = title
-    logger.error(text_title)
+    logger.debug(text_title)
+    # Convert some of remaining text to unicode
+    text_title = convert_to_unicode(text_title)
     # insert spaces before and after the following characters
     char_with_spaces = ["=", "→"]
     for my_char in char_with_spaces:
@@ -164,6 +234,10 @@ def format_title(title):
     text_title = re.sub(r"_+", "_", text_title)
     # reduce all hyphens to a maximum of one
     text_title = re.sub(r"-+", "-", text_title)
+    # remove space before comma
+    text_title = text_title.replace(" ,", ",")
+    # merge s_NN
+    text_title = text_title.replace("s_ NN", "s_NN").strip()
     return text_title
 
 

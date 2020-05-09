@@ -4,7 +4,7 @@ import os
 import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-import cds_paper_bot  # pylint: disable=wrong-import-position
+import cds_paper_bot  # pylint: disable=wrong-import-position,import-error
 
 
 class TestFormatTitle(object):
@@ -44,21 +44,21 @@ class TestFormatTitle(object):
                 "Study of hard color singlet exchange in dijet events with proton-proton collisions at $\\sqrt{s}= 13~\\mathrm{TeV}$",
                 "Study of hard color singlet exchange in dijet events with proton-proton collisions at √(s) = 13 TeV",
             ),
-            # (
-            #     "Inclusive search for a highly boosted Higgs boson decaying to a bottom quark-antiquark pair at $\\sqrt{s} = 13~\\mathrm{TeV}$ with $137~\\mathrm{fb}^{-1}$",
-            #     "Inclusive search for a highly boosted Higgs boson decaying to a bottom quark-antiquark pair at √(s) = 13 TeV with 137 fb^-1",
-            # ),
+            (
+                "Inclusive search for a highly boosted Higgs boson decaying to a bottom quark-antiquark pair at $\\sqrt{s} = 13~\\mathrm{TeV}$ with $137~\\mathrm{fb}^{-1}$",
+                "Inclusive search for a highly boosted Higgs boson decaying to a bottom quark-antiquark pair at √(s) = 13 TeV with 137 fb⁻¹",
+            ),
             (
                 "Observation of heavy triboson production in leptonic final states in proton-proton collisions at $\\sqrt{s}=13~\\mathrm{TeV}$",
                 "Observation of heavy triboson production in leptonic final states in proton-proton collisions at √(s) = 13 TeV",
             ),
             (
                 "Studies of $\\mathrm{W^+W^-}$ production at $\\sqrt{s}=13~\\mathrm{TeV}$",
-                "Studies of W^+W^- production at √(s) = 13 TeV",
+                "Studies of W⁺W⁻ production at √(s) = 13 TeV",
             ),
             (
                 "Measurement of the $CP$ violating phase $\\phi_{\\text{s}}$ in the $\\mathrm{B}_s \\to \\mathrm{J}/\\psi\\,\\phi(1020) \\to \\mu^+\\mu^-\\,\\mathrm{K}^+\\mathrm{K}^-$ channel in proton-proton collisions at $\\sqrt{s} = 13~\\mathrm{TeV}$",
-                "Measurement of the CP violating phase ϕ_s in the B_s → J/ψ ϕ(1020) → μ^+μ^- K^+K^- channel in proton-proton collisions at √(s) = 13 TeV",
+                "Measurement of the CP violating phase ϕ_s in the B_s → J/ψ ϕ(1020) → μ⁺μ⁻ K⁺K⁻ channel in proton-proton collisions at √(s) = 13 TeV",
             ),
             (
                 "Measurements of production cross sections of same-sign WW and WZ boson pairs in association with two jets in proton-proton collisions at sqrts = 13 TeV",
@@ -86,7 +86,7 @@ class TestFormatTitle(object):
             ),
             (
                 "Measurement of prompt $\\rm{ D_{s}^{+}}$ production in pp and PbPb collisions at $\\sqrt{s_{_{\\text{NN}}}}$ = 5.02 TeV",
-                "Measurement of prompt D_s^+ production in pp and PbPb collisions at √(s_NN) = 5.02 TeV",
+                "Measurement of prompt D⁺_s production in pp and PbPb collisions at √(s_NN) = 5.02 TeV",
             ),
             (
                 "Extraction of CKM matrix elements in single top quark $t$-channel events in proton-proton collisions at $\\sqrt{s} = 13$ TeV",
@@ -102,7 +102,7 @@ class TestFormatTitle(object):
             ),
             (
                 "Search for strong electromagnetic fields in PbPb collisions at 5.02 TeV via azimuthal anisotropy of $\\mathrm{D^0}$ and $\\mathrm{\\overline{D}^0}$ mesons",
-                "Search for strong electromagnetic fields in PbPb collisions at 5.02 TeV via azimuthal anisotropy of D^0 and D^0 mesons",
+                "Search for strong electromagnetic fields in PbPb collisions at 5.02 TeV via azimuthal anisotropy of D⁰ and D̅⁰ mesons",
             ),
             (
                 "Studies of charm and beauty long-range correlations in pp and pPb collisions",
@@ -146,7 +146,7 @@ class TestFormatTitle(object):
             ),
             (
                 "Study of the $\\mathrm{B}^{+}\\rightarrow \\mathrm{J}/\\psi \\bar{\\Lambda} \\mathrm{p}$ decay in proton-proton collisions at $\\sqrt{s}= 8~\\mathrm{TeV}$",
-                "Study of the B^+ → J/ψΛ̅p decay in proton-proton collisions at √(s) = 8 TeV",
+                "Study of the B⁺ → J/ψΛ̅p decay in proton-proton collisions at √(s) = 8 TeV",
             ),
             (
                 "Search for new physics in multilepton final states in pp collisions at $\\sqrt{s}=13~\\mathrm{TeV}$",
@@ -271,7 +271,7 @@ class TestFormatTitle(object):
             ),
             (
                 "Study of central exclusive $\\pi^{+}\\pi^{-}$ production in proton-proton collisions at $\\sqrt{s} = $ 5.02 and 13 TeV",
-                "Study of central exclusive π^+π^- production in proton-proton collisions at √(s) = 5.02 and 13 TeV",
+                "Study of central exclusive π⁺π⁻ production in proton-proton collisions at √(s) = 5.02 and 13 TeV",
             ),
             (
                 "Pileup mitigation at CMS in 13 TeV data",
@@ -291,7 +291,7 @@ class TestFormatTitle(object):
             ),
             (
                 "Measurement of the $\\Upsilon(\\text{1S}) $ pair production cross section and search for resonances decaying to $\\Upsilon(\\text{1S}) \\mu^{+}\\mu^{-}$ in proton-proton collisions at $\\sqrt{s} = $ 13 TeV",
-                "Measurement of the Υ(1S) pair production cross section and search for resonances decaying to Υ(1S) μ^+μ^- in proton-proton collisions at √(s) = 13 TeV",
+                "Measurement of the Υ(1S) pair production cross section and search for resonances decaying to Υ(1S) μ⁺μ⁻ in proton-proton collisions at √(s) = 13 TeV",
             ),
             (
                 "Search for physics beyond the standard model in events with jets and two same-sign or at least three charged leptons in proton-proton collisions at $\\sqrt{s}=$ 13 TeV",
@@ -311,7 +311,7 @@ class TestFormatTitle(object):
             ),
             (
                 "Study of excited $\\Lambda_{\\mathrm{b}}^{0}$ states decaying to $\\Lambda_{\\mathrm{b}}^{0}\\pi^{+}\\pi^{-}$ in proton-proton collisions at $\\sqrt{s} = $ 13 TeV",
-                "Study of excited Λ_b^0 states decaying to Λ_b^0π^+π^- in proton-proton collisions at √(s) = 13 TeV",
+                "Study of excited Λ⁰_b states decaying to Λ⁰_b π⁺π⁻ in proton-proton collisions at √(s) = 13 TeV",
             ),
             (
                 "Search for an excited lepton that decays via a contact interaction to a lepton and two jets in proton-proton collisions at ${\\sqrt{s}} = $ 13 TeV",
@@ -343,7 +343,7 @@ class TestFormatTitle(object):
             ),
             (
                 "Search for a low-mass $\\tau^{-}\\tau^{+}$ resonance in association with a bottom quark in proton-proton collisions at $\\sqrt{s} = $ 13 TeV",
-                "Search for a low-mass τ^-τ^+ resonance in association with a bottom quark in proton-proton collisions at √(s) = 13 TeV",
+                "Search for a low-mass τ⁻τ⁺ resonance in association with a bottom quark in proton-proton collisions at √(s) = 13 TeV",
             ),
             (
                 "Search for supersymmetry in final states with photons and missing transverse momentum in proton-proton collisions at 13 TeV",
@@ -375,7 +375,7 @@ class TestFormatTitle(object):
             ),
             (
                 "Combinations of single-top-quark production cross-section measurements and $|f_{\\rm LV}V_{tb}|$ determinations at $\\sqrt{s}=7$ and 8 TeV with the ATLAS and CMS experiments",
-                "Combinations of single-top-quark production cross-section measurements and |f_ LVV_tb| determinations at √(s) = 7 and 8 TeV with the ATLAS and CMS experiments",
+                "Combinations of single-top-quark production cross-section measurements and |f_LVV_tb| determinations at √(s) = 7 and 8 TeV with the ATLAS and CMS experiments",
             ),
             (
                 "Azimuthal separation in nearly back-to-back jet topologies in inclusive 2- and 3-jet events in pp collisions at $\\sqrt{s}=$ 13 TeV",
@@ -387,11 +387,11 @@ class TestFormatTitle(object):
             ),
             (
                 "Measurement of exclusive $\\rho(770)^{0}$ photoproduction in ultraperipheral pPb collisions at ${\\sqrt {\\smash [b]{s_{_{\\mathrm {NN}}}}}} = $ 5.02 TeV",
-                "Measurement of exclusive ρ(770)^0 photoproduction in ultraperipheral pPb collisions at √(s_NN) = 5.02 TeV",
+                "Measurement of exclusive ρ⁰(770) photoproduction in ultraperipheral pPb collisions at √(s_NN) = 5.02 TeV",
             ),
             (
                 "Observation of two excited $ \\mathrm{B^{+}_{c}} $ states and measurement of the ${\\mathrm{B^{+}_{c}} \\text{(2S)}}$ mass in pp collisions at $\\sqrt{s} = $ 13 TeV",
-                "Observation of two excited B^+_c states and measurement of the B^+_c(2S) mass in pp collisions at √(s) = 13 TeV",
+                "Observation of two excited B⁺_c states and measurement of the B⁺_c (2S) mass in pp collisions at √(s) = 13 TeV",
             ),
             (
                 "Search for W boson decays to three charged pions",
@@ -452,7 +452,7 @@ class TestFormatTitle(object):
             ),
             (
                 "Search for supersymmetry in pp collisions at $\\sqrt{s}=13~\\mathrm{TeV}$ with $137~\\mathrm{fb}^{-1}$ in the final state with a single lepton using the sum of masses of large-radius jets",
-                "Search for supersymmetry in pp collisions at √(s) = 13 TeV with 137 fb^-1 in the final state with a single lepton using the sum of masses of large-radius jets",
+                "Search for supersymmetry in pp collisions at √(s) = 13 TeV with 137 fb⁻¹ in the final state with a single lepton using the sum of masses of large-radius jets",
             ),
             (
                 "Measurement of the top quark pair production cross section in the dilepton channel including a $\\tau$ lepton in proton-proton collisions at $\\sqrt{s}=13~\\mathrm{TeV}$",
@@ -480,7 +480,7 @@ class TestFormatTitle(object):
             ),
             (
                 "Search for a narrow resonance in high-mass dilepton final states in proton-proton collisions using 140$~\\mathrm{fb}^{-1}$ of data at $\\sqrt{s}=13~\\mathrm{TeV}$",
-                "Search for a narrow resonance in high-mass dilepton final states in proton-proton collisions using 140 fb^-1 of data at √(s) = 13 TeV",
+                "Search for a narrow resonance in high-mass dilepton final states in proton-proton collisions using 140 fb⁻¹ of data at √(s) = 13 TeV",
             ),
             (
                 "Search for dijet resonances in events with three jets from proton-proton collisions at $\\sqrt{s}=13~\\mathrm{TeV}$",
@@ -658,15 +658,15 @@ class TestFormatTitle(object):
             ),
             (
                 "Combined measurements of Higgs boson production and decay using up to $80$ fb$^{-1}$ of proton--proton collision data at $\\sqrt{s}=$ 13 TeV collected with the ATLAS experiment",
-                "Combined measurements of Higgs boson production and decay using up to 80 fb^-1 of proton–proton collision data at √(s) = 13 TeV collected with the ATLAS experiment",
+                "Combined measurements of Higgs boson production and decay using up to 80 fb⁻¹ of proton–proton collision data at √(s) = 13 TeV collected with the ATLAS experiment",
             ),
             (
                 "Measurement of Higgs boson production in association with a $t\\overline t$ pair in the diphoton decay channel using 139~fb$^{-1}$ of LHC data collected at $\\sqrt{s} = 13$~TeV by the ATLAS experiment",
-                "Measurement of Higgs boson production in association with a tt pair in the diphoton decay channel using 139 fb^-1 of LHC data collected at √(s) = 13 TeV by the ATLAS experiment",
+                "Measurement of Higgs boson production in association with a tt pair in the diphoton decay channel using 139 fb⁻¹ of LHC data collected at √(s) = 13 TeV by the ATLAS experiment",
             ),
             (
                 "Search for diboson resonances in hadronic final states in 139 fb$^{-1}$ of $pp$ collisions at $\\sqrt{s} = 13$ TeV with the ATLAS detector",
-                "Search for diboson resonances in hadronic final states in 139 fb^-1 of pp collisions at √(s) = 13 TeV with the ATLAS detector",
+                "Search for diboson resonances in hadronic final states in 139 fb⁻¹ of pp collisions at √(s) = 13 TeV with the ATLAS detector",
             ),
             (
                 "Observation of light-by-light scattering in ultraperipheral Pb+Pb collisions with the ATLAS detector",
@@ -674,7 +674,7 @@ class TestFormatTitle(object):
             ),
             (
                 "Search for high-mass dilepton resonances using $139\\,\\mathrm{fb}^{-1}$ of $pp$ collision data collected at $\\sqrt{s}=13\\,\\mathrm{TeV}$ with the ATLAS detector",
-                "Search for high-mass dilepton resonances using 139 fb^-1 of pp collision data collected at √(s) = 13 TeV with the ATLAS detector",
+                "Search for high-mass dilepton resonances using 139 fb⁻¹ of pp collision data collected at √(s) = 13 TeV with the ATLAS detector",
             ),
             (
                 "Calibration of the $b$-tagging eﬃciency on charm jets using a sample of $W$+$c$ events with $\\sqrt{s}$ = 13 TeV ATLAS data",
@@ -751,7 +751,7 @@ class TestFormatTitle(object):
             ),
             (
                 "Search for high-mass dilepton resonances using 139 fb$^{-1}$ of $pp$ collision data collected at $\\sqrt{s}=13$ TeV with the ATLAS detector",
-                "Search for high-mass dilepton resonances using 139 fb^-1 of pp collision data collected at √(s) = 13 TeV with the ATLAS detector",
+                "Search for high-mass dilepton resonances using 139 fb⁻¹ of pp collision data collected at √(s) = 13 TeV with the ATLAS detector",
             ),
             (
                 "Measurement of $VH$, $H\\to b\\bar{b}$ production as a function of the vector-boson transverse momentum in 13 TeV $pp$ collisions with the ATLAS detector",
@@ -783,7 +783,7 @@ class TestFormatTitle(object):
             ),
             (
                 "Combinations of single-top-quark production cross-section measurements and $|f_{\\rm LV}V_{tb}|$ determinations at $\\sqrt{s}=7$ and 8 TeV with the ATLAS and CMS experiments",
-                "Combinations of single-top-quark production cross-section measurements and |f_ LVV_tb| determinations at √(s) = 7 and 8 TeV with the ATLAS and CMS experiments",
+                "Combinations of single-top-quark production cross-section measurements and |f_LVV_tb| determinations at √(s) = 7 and 8 TeV with the ATLAS and CMS experiments",
             ),
             (
                 "Measurement of the four-lepton invariant mass spectrum in 13 TeV proton-proton collisions with the ATLAS detector",
@@ -803,7 +803,7 @@ class TestFormatTitle(object):
             ),
             (
                 "Search for heavy charged long-lived particles in the ATLAS detector in 31.6 fb$^{-1}$ of proton-proton collision data at $\\sqrt{s} = 13$ TeV",
-                "Search for heavy charged long-lived particles in the ATLAS detector in 31.6 fb^-1 of proton-proton collision data at √(s) = 13 TeV",
+                "Search for heavy charged long-lived particles in the ATLAS detector in 31.6 fb⁻¹ of proton-proton collision data at √(s) = 13 TeV",
             ),
             (
                 "Searches for scalar leptoquarks and differential cross-section measurements in dilepton-dijet events in proton-proton collisions at a centre-of-mass energy of $\\sqrt{s} = 13$ TeV with the ATLAS experiment",
@@ -815,7 +815,7 @@ class TestFormatTitle(object):
             ),
             (
                 "Dijet azimuthal correlations and conditional yields in $pp$ and $p$+Pb collisions at $\\sqrt{s_{\\rm NN}}$ = 5.02 TeV with the ATLAS detector",
-                "Dijet azimuthal correlations and conditional yields in pp and p+Pb collisions at √(s_ NN) = 5.02 TeV with the ATLAS detector",
+                "Dijet azimuthal correlations and conditional yields in pp and p+Pb collisions at √(s_NN) = 5.02 TeV with the ATLAS detector",
             ),
             (
                 "Measurement of the ratio of cross sections for inclusive isolated-photon production in $pp$ collisions at $\\sqrt{s}=13$ and $8$ TeV with the ATLAS detector",
@@ -823,7 +823,7 @@ class TestFormatTitle(object):
             ),
             (
                 "Search for scalar resonances decaying into $\\mu^{+}\\mu^{-}$ in events with and without $b$-tagged jets produced in proton-proton collisions at $\\sqrt{s}=13$ TeV with the ATLAS detector",
-                "Search for scalar resonances decaying into μ^+μ^- in events with and without b-tagged jets produced in proton-proton collisions at √(s) = 13 TeV with the ATLAS detector",
+                "Search for scalar resonances decaying into μ⁺μ⁻ in events with and without b-tagged jets produced in proton-proton collisions at √(s) = 13 TeV with the ATLAS detector",
             ),
             (
                 "Measurement of the $t\\bar{t}Z$ and $t\\bar{t}W$ cross sections in proton-proton collisions at $\\sqrt{s}=13$ TeV with the ATLAS detector",
@@ -831,7 +831,7 @@ class TestFormatTitle(object):
             ),
             (
                 "Search for top-quark decays $t \\rightarrow Hq$ with 36 fb$^{-1}$ of $pp$ collision data at $\\sqrt{s}=13$ TeV with the ATLAS detector",
-                "Search for top-quark decays t → Hq with 36 fb^-1 of pp collision data at √(s) = 13 TeV with the ATLAS detector",
+                "Search for top-quark decays t → Hq with 36 fb⁻¹ of pp collision data at √(s) = 13 TeV with the ATLAS detector",
             ),
             # ATLAS atlas_paper_feed
             (
@@ -844,7 +844,7 @@ class TestFormatTitle(object):
             ),
             (
                 "Search for new resonances in mass distributions of jet pairs using 139  fb$^{-1}$ of $pp$ collisions at $\\sqrt{s}=13$ TeV with the ATLAS detector",
-                "Search for new resonances in mass distributions of jet pairs using 139 fb^-1 of pp collisions at √(s) = 13 TeV with the ATLAS detector",
+                "Search for new resonances in mass distributions of jet pairs using 139 fb⁻¹ of pp collisions at √(s) = 13 TeV with the ATLAS detector",
             ),
             (
                 "Determination of jet calibration and energy resolution in proton-proton  collisions at $\\sqrt{s}$ = 8 TeV using the ATLAS detector",
@@ -864,11 +864,11 @@ class TestFormatTitle(object):
             ),
             (
                 "Search for squarks and gluinos in final states with same-sign leptons  and jets using 139 fb$^{-1}$ of data collected with the ATLAS detector",
-                "Search for squarks and gluinos in final states with same-sign leptons and jets using 139 fb^-1 of data collected with the ATLAS detector",
+                "Search for squarks and gluinos in final states with same-sign leptons and jets using 139 fb⁻¹ of data collected with the ATLAS detector",
             ),
             (
                 "Combined measurements of Higgs boson production and decay using up to $80$ fb$^{-1}$ of proton-proton collision data at $\\sqrt{s}=$ 13 TeV  collected with the ATLAS experiment",
-                "Combined measurements of Higgs boson production and decay using up to 80 fb^-1 of proton-proton collision data at √(s) = 13 TeV collected with the ATLAS experiment",
+                "Combined measurements of Higgs boson production and decay using up to 80 fb⁻¹ of proton-proton collision data at √(s) = 13 TeV collected with the ATLAS experiment",
             ),
             (
                 "Measurement of azimuthal anisotropy of muons from charm and bottom  hadrons in $pp$ collisions at $\\sqrt{s}=13$ TeV with the ATLAS detector",
@@ -884,7 +884,7 @@ class TestFormatTitle(object):
             ),
             (
                 "Search for flavour-changing neutral currents in processes with one top  quark and a photon using 81 fb$^{-1}$ of $pp$ collisions at $\\sqrt{s} = 13$ TeV with the ATLAS experiment",
-                "Search for flavour-changing neutral currents in processes with one top quark and a photon using 81 fb^-1 of pp collisions at √(s) = 13 TeV with the ATLAS experiment",
+                "Search for flavour-changing neutral currents in processes with one top quark and a photon using 81 fb⁻¹ of pp collisions at √(s) = 13 TeV with the ATLAS experiment",
             ),
             (
                 "Search for electroweak production of charginos and sleptons decaying  into final states with two leptons and missing transverse momentum in  $\\sqrt{s}=13$ TeV $pp$ collisions using the ATLAS detector",
@@ -908,7 +908,7 @@ class TestFormatTitle(object):
             ),
             (
                 "Measurement of the inclusive isolated-photon cross section in $pp$  collisions at $\\sqrt{s}=13$ TeV using 36 fb$^{-1}$ of ATLAS data",
-                "Measurement of the inclusive isolated-photon cross section in pp collisions at √(s) = 13 TeV using 36 fb^-1 of ATLAS data",
+                "Measurement of the inclusive isolated-photon cross section in pp collisions at √(s) = 13 TeV using 36 fb⁻¹ of ATLAS data",
             ),
             (
                 "Electron and photon performance measurements with the ATLAS detector using the 2015-2017 LHC proton-proton collision data",
@@ -916,7 +916,7 @@ class TestFormatTitle(object):
             ),
             (
                 "Measurement of $K_S^0$ and $\\Lambda^0$ production in $t \\bar{t}$ dileptonic events in $pp$ collisions at $\\sqrt{s} =$ 7 TeV with the ATLAS detector",
-                "Measurement of K_S^0 and Λ^0 production in tt̅ dileptonic events in pp collisions at √(s) = 7 TeV with the ATLAS detector",
+                "Measurement of K⁰_S and Λ⁰ production in tt̅ dileptonic events in pp collisions at √(s) = 7 TeV with the ATLAS detector",
             ),
             (
                 "Measurement of $W^\\pm$ boson production in Pb+Pb collisions at  $\\sqrt{s_\\mathrm{NN}} = 5.02$ TeV with the ATLAS detector",
@@ -937,7 +937,7 @@ class TestFormatTitle(object):
             # ALICE alice_paper_feed
             (
                 "One-dimensional charged kaon femtoscopy in p-Pb collisions at $\\sqrt{s_{\\rm NN}}$ = 5.02 TeV",
-                "One-dimensional charged kaon femtoscopy in p-Pb collisions at √(s_ NN) = 5.02 TeV",
+                "One-dimensional charged kaon femtoscopy in p-Pb collisions at √(s_NN) = 5.02 TeV",
             ),
             (
                 "Investigations of anisotropic flow using multi-particle azimuthal correlations in pp, p$-$Pb, Xe$-$Xe, and Pb$-$Pb collisions at the LHC",
@@ -953,7 +953,7 @@ class TestFormatTitle(object):
             ),
             (
                 "Measurement of D$^0$, D$^+$, D$^*$ and D$_s$ production in pp collisions at  $\\sqrt{s}$ = 5.02 TeV",
-                "Measurement of D^0, D^+, D^* and D_s production in pp collisions at √(s) = 5.02 TeV",
+                "Measurement of D⁰, D⁺, D* and D_s production in pp collisions at √(s) = 5.02 TeV",
             ),
             (
                 "Real-time data processing in the ALICE High Level Trigger at the LHC",
@@ -965,7 +965,7 @@ class TestFormatTitle(object):
             ),
             (
                 "Study of J/$\\psi$ azimuthal anisotropy at forward rapidity in Pb-Pb collisions at $\\sqrt{s_{\\rm NN}}$ = 5.02 TeV",
-                "Study of J/ψ azimuthal anisotropy at forward rapidity in Pb-Pb collisions at √(s_ NN) = 5.02 TeV",
+                "Study of J/ψ azimuthal anisotropy at forward rapidity in Pb-Pb collisions at √(s_NN) = 5.02 TeV",
             ),
             (
                 "Charged-particle pseudorapidity density at mid-rapidity in p-Pb collisions at $\\sqrt{s_{\\rm{NN}}}$ = 8.16 TeV",
@@ -977,11 +977,11 @@ class TestFormatTitle(object):
             ),
             (
                 "$\\Lambda_{\\rm c}^{+}$ production in Pb-Pb collisions at $\\sqrt{s_{\\rm NN}}=5.02$ TeV",
-                "Λ_ c^+ production in Pb-Pb collisions at √(s_ NN) = 5.02 TeV",
+                "Λ⁺_c production in Pb-Pb collisions at √(s_NN) = 5.02 TeV",
             ),
             (
                 "Event-shape engineering for the D-meson elliptic flow in mid-central Pb-Pb collisions at $\\sqrt{s_{\\rm NN}}=5.02$ TeV",
-                "Event-shape engineering for the D-meson elliptic flow in mid-central Pb-Pb collisions at √(s_ NN) = 5.02 TeV",
+                "Event-shape engineering for the D-meson elliptic flow in mid-central Pb-Pb collisions at √(s_NN) = 5.02 TeV",
             ),
             (
                 "Energy dependence of exclusive $J/\\psi$ photoproduction off protons in ultra-peripheral p-Pb collisions at $\\sqrt{s_{\\rm{NN}}}$ = 5.02 TeV",
@@ -993,7 +993,7 @@ class TestFormatTitle(object):
             ),
             (
                 "Measuring $\\rm{K}^{0}\\rm{K}^{\\pm}$ interactions using pp collisions at $\\sqrt{s}$ = 7 TeV",
-                "Measuring K^0K^± interactions using pp collisions at √(s) = 7 TeV",
+                "Measuring K⁰K^± interactions using pp collisions at √(s) = 7 TeV",
             ),
             (
                 "Multiplicity dependence of light-flavor hadron production in pp collisions at $\\sqrt{s}$ = 7 TeV",
@@ -1017,7 +1017,7 @@ class TestFormatTitle(object):
             ),
             (
                 "Centrality and pseudorapidity dependence of the charged-particle multiplicity density in Xe-Xe collisions at $\\sqrt{s_{\\rm NN}}$ = 5.44 TeV",
-                "Centrality and pseudorapidity dependence of the charged-particle multiplicity density in Xe-Xe collisions at √(s_ NN) = 5.44 TeV",
+                "Centrality and pseudorapidity dependence of the charged-particle multiplicity density in Xe-Xe collisions at √(s_NN) = 5.44 TeV",
             ),
             (
                 "Azimuthal anisotropy of heavy-flavour decay electrons in p-Pb collisions at $\\sqrt{s_{NN}}$ = 5.02 TeV",
@@ -1046,7 +1046,7 @@ class TestFormatTitle(object):
             ),
             (
                 "Measurement of the (anti-)$^{3}$He elliptic flow in Pb-Pb collisions at $\\sqrt{s_{\\rm NN}}$ = 5.02 TeV",
-                "Measurement of the (anti-)^3He elliptic flow in Pb-Pb collisions at √(s_ NN) = 5.02 TeV",
+                "Measurement of the (anti-)^3He elliptic flow in Pb-Pb collisions at √(s_NN) = 5.02 TeV",
             ),
             (
                 "Measurements of inclusive jet spectra in pp and central Pb–Pb collisions at $\\sqrt{s_{\\rm{NN}}}$ = 5.02 TeV",
@@ -1054,7 +1054,7 @@ class TestFormatTitle(object):
             ),
             (
                 "Studies of J/$\\psi$ production at forward rapidity in Pb-Pb collisions at $\\sqrt{s_{\\rm NN}}$ = 5.02 TeV",
-                "Studies of J/ψ production at forward rapidity in Pb-Pb collisions at √(s_ NN) = 5.02 TeV",
+                "Studies of J/ψ production at forward rapidity in Pb-Pb collisions at √(s_NN) = 5.02 TeV",
             ),
             (
                 "Measurement of $\\Lambda$(1520) production in pp collisions at $\\sqrt{s}$ = 7 TeV and p-Pb collisions at $\\sqrt{s_{\\rm{NN}}}$ = 5.02 TeV",
@@ -1078,7 +1078,7 @@ class TestFormatTitle(object):
             ),
             (
                 "Measurement of prompt D$^{0}$, D$^{+}$, D$^{∗+}$,  and D$^{+}_{s}$ production in p$-$Pb collisions at $\\sqrt{s_{\\rm NN}}$ = 5.02 TeV",
-                "Measurement of prompt D^0, D^+, D^∗+, and D^+_s production in p-Pb collisions at √(s_ NN) = 5.02 TeV",
+                "Measurement of prompt D⁰, D⁺, D*⁺, and D⁺_s production in p-Pb collisions at √(s_NN) = 5.02 TeV",
             ),
             (
                 "Multiplicity dependence of light (anti-)nuclei production in p-Pb collisions at $\\sqrt{s_{\\rm{NN}}}$ = 5.02 TeV",
@@ -1110,7 +1110,7 @@ class TestFormatTitle(object):
             ),
             (
                 "Measurement of the production of charm jets tagged with D$^{0}$ mesons in pp collisions at $\\sqrt{s}$= 7 TeV",
-                "Measurement of the production of charm jets tagged with D^0 mesons in pp collisions at √(s) = 7 TeV",
+                "Measurement of the production of charm jets tagged with D⁰ mesons in pp collisions at √(s) = 7 TeV",
             ),
             (
                 "First observation of an attractive interaction between a proton and a multi-strange baryon",
@@ -1118,7 +1118,7 @@ class TestFormatTitle(object):
             ),
             (
                 "Measurement of jet radial profiles in Pb$-$Pb collisions at $\\sqrt{s_{\\rm NN}}$ = 2.76 TeV",
-                "Measurement of jet radial profiles in Pb-Pb collisions at √(s_ NN) = 2.76 TeV",
+                "Measurement of jet radial profiles in Pb-Pb collisions at √(s_NN) = 2.76 TeV",
             ),
             (
                 "Production of muons from heavy-flavour hadron decays in pp collisions at $\\sqrt{s}=5.02$ TeV",
@@ -1135,11 +1135,11 @@ class TestFormatTitle(object):
             # LHCb lhcb_paper_feed
             (
                 "Measurements of $CP$ asymmetries in charmless four-body $\\Lambda^0_b$ and $\\Xi_b^0$ decays",
-                "Measurements of CP asymmetries in charmless four-body Λ^0_b and Ξ_b^0 decays",
+                "Measurements of CP asymmetries in charmless four-body Λ⁰_b and Ξ⁰_b decays",
             ),
             (
                 "Observation of an excited $B_c^+$ state",
-                "Observation of an excited B_c^+ state",
+                "Observation of an excited B⁺_c state",
             ),
             (
                 "Near-threshold $D\\bar{D}$ spectroscopy and observation of a new charmonium state",
@@ -1147,15 +1147,15 @@ class TestFormatTitle(object):
             ),
             (
                 "Search for lepton-universality violation in $B^+\\to K^+\\ell^+\\ell^-$ decays",
-                "Search for lepton-universality violation in B^+ → K^+ℓ^+ℓ^- decays",
+                "Search for lepton-universality violation in B⁺ → K⁺ℓ⁺ℓ⁻ decays",
             ),
             (
                 "Observation of $C\\!P$ violation in charm decays",
                 "Observation of CP violation in charm decays",
             ),
             (
-                "Measurement of the $CP$-violating phase $\\phi_s$ from $B_{s}^{0}\\to J/\\psi\\pi^+\\pi^-$ decays in 13 TeV $pp$ collisions",
-                "Measurement of the CP-violating phase ϕ_s from B_s^0 → J/ψπ^+π^- decays in 13 TeV pp collisions",
+                "Measurement of the $CP$-violating phase $\\phi_s$ from $B_{s}^{0}\\to J/\\psi\\pi^+\\pi⁻$ decays in 13 TeV $pp$ collisions",
+                "Measurement of the CP-violating phase ϕ_s from B⁰_s → J/ψπ⁺π⁻ decays in 13 TeV pp collisions",
             ),
             (
                 "Measurement of the mass difference between neutral charm-meson eigenstates",
@@ -1163,11 +1163,11 @@ class TestFormatTitle(object):
             ),
             (
                 "Search for $CP$ violation in $D^+_s\\to K_S^0\\pi^+$, $D^+\\to K_S^0K^+$ and $D^+\\to\\phi\\pi^+$ decays",
-                "Search for CP violation in D^+_s → K_S^0π^+, D^+ → K_S^0K^+ and D^+ → ϕπ^+ decays",
+                "Search for CP violation in D⁺_s → K⁰_S π⁺, D⁺ → K⁰_S K⁺ and D⁺ → ϕπ⁺ decays",
             ),
             (
                 "Amplitude analysis of $B^{0}_{s} \\rightarrow K^{0}_{\\textrm{S}} K^{\\pm}\\pi^{\\mp}$ decays",
-                "Amplitude analysis of B^0_s → K^0_S K^±π^∓ decays",
+                "Amplitude analysis of B⁰_s → K⁰_S K^±π^∓ decays",
             ),
             (
                 "Measurement of $b$-hadron fractions in 13 TeV $pp$ collisions",
@@ -1175,43 +1175,43 @@ class TestFormatTitle(object):
             ),
             (
                 "Dalitz Plot analysis of the $D^+ \\to K^- K^+ K^+$ decay",
-                "Dalitz Plot analysis of the D^+ → K^- K^+ K^+ decay",
+                "Dalitz Plot analysis of the D⁺ → K⁻ K⁺ K⁺ decay",
             ),
             (
                 "Observation of $B^0_{(s)} \\to J/\\psi p \\overline{p}$ decays and precision measurements of the $B^0_{(s)}$ masses",
-                "Observation of B^0_(s) → J/ψ pp decays and precision measurements of the B^0_(s) masses",
+                "Observation of B⁰_s → J/ψ pp decays and precision measurements of the B⁰_s masses",
             ),
             (
                 "Measurement of $B^+$, $B^0$ and $\\Lambda_b^0$ production in $p\\mkern 1mu\\mathrm{Pb}$ collisions at $\\sqrt{s_{NN}} = 8.16 \\ \\rm TeV$",
-                "Measurement of B^+, B^0 and Λ_b^0 production in p 1muPb collisions at √(s_NN) = 8.16 TeV",
+                "Measurement of B⁺, B⁰ and Λ⁰_b production in p 1muPb collisions at √(s_NN) = 8.16 TeV",
             ),
             (
                 "Measurement of the ratio of branching fractions of the decays $\\Lambda_b^0 \\!\\to \\psi(2S) \\Lambda$ and $\\Lambda_b^0 \\!\\to J\\!/\\!\\psi \\Lambda$",
-                "Measurement of the ratio of branching fractions of the decays Λ_b^0 → ψ(2S) Λ and Λ_b^0 → J/ψΛ",
+                "Measurement of the ratio of branching fractions of the decays Λ⁰_b → ψ(2S) Λ and Λ⁰_b → J/ψΛ",
             ),
             (
                 "Measurement of the mass and production rate of $\\Xi_b^-$ baryons",
-                "Measurement of the mass and production rate of Ξ_b^- baryons",
+                "Measurement of the mass and production rate of Ξ⁻_b baryons",
             ),
             (
                 "Model-independent observation of exotic contributions to $B^0\\to J/\\psi K^+\\pi^-$ decays",
-                "Model-independent observation of exotic contributions to B^0 → J/ψ K^+π^- decays",
+                "Model-independent observation of exotic contributions to B⁰ → J/ψ K⁺π⁻ decays",
             ),
             (
                 "Measurement of the branching fraction and $C\\!P$ asymmetry in $B^{+}\\rightarrow J/\\psi \\rho^{+}$ decays",
-                "Measurement of the branching fraction and CP asymmetry in B^+ → J/ψρ^+ decays",
+                "Measurement of the branching fraction and CP asymmetry in B⁺ → J/ψρ⁺ decays",
             ),
             (
                 "Search for the rare decay $B^{+} \\rightarrow \\mu^{+}\\mu^{-}\\mu^{+}\\nu_{\\mu}$",
-                "Search for the rare decay B^+ → μ^+μ^-μ^+ν_μ",
+                "Search for the rare decay B⁺ → μ⁺μ⁻μ⁺ν_μ",
             ),
             (
                 "Study of the $B^0\\to \\rho(770)^0 K^*(892)^0$ decay with an amplitude analysis of $B^0\\to (\\pi^+\\pi^-) (K^+\\pi^-)$ decays",
-                "Study of the B^0 → ρ(770)^0 K^*(892)^0 decay with an amplitude analysis of B^0 → (π^+π^-) (K^+π^-) decays",
+                "Study of the B⁰ → ρ⁰(770) K*⁰(892) decay with an amplitude analysis of B⁰ → (π⁺π⁻) (K⁺π⁻) decays",
             ),
             (
                 "Search for $CP$ violation through an amplitude analysis of $D^0\\rightarrow K^+ K^- \\pi^+ \\pi^-$ decays",
-                "Search for CP violation through an amplitude analysis of D^0 → K^+ K^- π^+ π^- decays",
+                "Search for CP violation through an amplitude analysis of D⁰ → K⁺ K⁻ π⁺ π⁻ decays",
             ),
             (
                 "First measurement of charm production in fixed-target configuration at the LHC",
@@ -1227,11 +1227,11 @@ class TestFormatTitle(object):
             ),
             (
                 "Measurement of the branching fractions of the decays $D^+\\rightarrow K^-K^+K^+$, $D^+\\rightarrow \\pi^-\\pi^+K^+$ and $D^+_s\\rightarrow\\pi^-K^+K^+$",
-                "Measurement of the branching fractions of the decays D^+ → K^-K^+K^+, D^+ → π^-π^+K^+ and D^+_s → π^-K^+K^+",
+                "Measurement of the branching fractions of the decays D⁺ → K⁻K⁺K⁺, D⁺ → π⁻π⁺K⁺ and D⁺_s → π⁻K⁺K⁺",
             ),
             (
                 "Observation of two resonances in the $\\Lambda_b^0 \\pi^\\pm$ systems and precise measurement of $\\Sigma_b^\\pm$ and $\\Sigma_b^{*\\pm}$ properties",
-                "Observation of two resonances in the Λ_b^0 π^± systems and precise measurement of Σ_b^± and Σ_b^*± properties",
+                "Observation of two resonances in the Λ⁰_b π^± systems and precise measurement of Σ^±_b and Σ*^±_b properties",
             ),
             # LHCb lhcb_conf_feed
             (
@@ -1243,12 +1243,12 @@ class TestFormatTitle(object):
                 "LHCb projections for proton-lead collisions during LHC Runs 3 and 4",
             ),
             (
-                "Measurement of $B^+$, $B^0$ and $\\Lambda_b^0$ production and nuclear modification in $p$Pb collisions at $\\sqrt{s_\\mathrm{NN}}=8.16 ~~\\text {TeV}$",
-                "Measurement of B^+, B^0 and Λ_b^0 production and nuclear modification in pPb collisions at √(s_NN) = 8.16 TeV",
+                "Measurement of $B^+$, $B^0$ and $\\Lambda⁰_b$ production and nuclear modification in $p$Pb collisions at $\\sqrt{s_\\mathrm{NN}}=8.16 ~~\\text {TeV}$",
+                "Measurement of B⁺, B⁰ and Λ⁰_b production and nuclear modification in pPb collisions at √(s_NN) = 8.16 TeV",
             ),
             (
                 "Study of coherent $J/\\psi$ production in lead-lead collisions at $\\sqrt{s_{\\rm NN}} =5\\ \\rm{TeV}$ with the LHCb experiment",
-                "Study of coherent J/ψ production in lead-lead collisions at √(s_ NN) = 5 TeV with the LHCb experiment",
+                "Study of coherent J/ψ production in lead-lead collisions at √(s_NN) = 5 TeV with the LHCb experiment",
             ),
             (
                 "Update of the LHCb combination of the CKM angle $\\gamma$",
@@ -1256,11 +1256,11 @@ class TestFormatTitle(object):
             ),
             (
                 "Measurement of CP violation in the $B_s^0 \\to \\phi \\phi$ decay and search for the $B^0 \\to \\phi\\phi$ decay",
-                "Measurement of CP violation in the B_s^0 → ϕϕ decay and search for the B^0 → ϕϕ decay",
+                "Measurement of CP violation in the B⁰_s → ϕϕ decay and search for the B⁰ → ϕϕ decay",
             ),
             (
                 "Prompt $\\Lambda^+_{\\mathrm{c}}$ production in $p\\mathrm{Pb}$ collisions at $\\sqrt{s_{_{\\mathrm{NN}}}} = 5.02\\mathrm{\\,Te\\kern -0.1em V}$",
-                "Prompt Λ^+_c production in pPb collisions at √(s_NN) = 5.02 Te -0.1em V",
+                "Prompt Λ⁺_c production in pPb collisions at √(s_NN) = 5.02 TeV",
             ),
             (
                 "Update of the LHCb combination of the CKM angle $\\gamma$ using $B\\to DK$ decays",
@@ -1268,51 +1268,51 @@ class TestFormatTitle(object):
             ),
             (
                 "Measurement of antiproton production in $p$He collisions at $\\sqrt{s_{\\scriptscriptstyle\\rm NN}}=110$ GeV",
-                "Measurement of antiproton production in pHe collisions at √(s_ NN) = 110 GeV",
+                "Measurement of antiproton production in pHe collisions at √(s_NN) = 110 GeV",
             ),
             (
                 "Measurement of $J/\\psi$ and $D^0$ production in $p$Ar collisions at $\\sqrt{s_{NN}}=110$ GeV",
-                "Measurement of J/ψ and D^0 production in pAr collisions at √(s_NN) = 110 GeV",
+                "Measurement of J/ψ and D⁰ production in pAr collisions at √(s_NN) = 110 GeV",
             ),
             (
                 "Measurement of time-dependent $C\\!P$-violating asymmetries in $B^0\\to\\pi^+\\pi^-$ and $B_s^0\\to K^+K^-$ decays at LHCb",
-                "Measurement of time-dependent CP-violating asymmetries in B^0 → π^+π^- and B_s^0 → K^+K^- decays at LHCb",
+                "Measurement of time-dependent CP-violating asymmetries in B⁰ → π⁺π⁻ and B⁰_s → K⁺K⁻ decays at LHCb",
             ),
             (
                 "First observation of a baryonic $B_s^0$ decay",
-                "First observation of a baryonic B_s^0 decay",
+                "First observation of a baryonic B⁰_s decay",
             ),
             (
                 "Measurement of $C\\!P$ asymmetry in $B_s^0\\to D_s^{\\mp}K^{\\pm}$ decays",
-                "Measurement of CP asymmetry in B_s^0 → D_s^∓K^± decays",
+                "Measurement of CP asymmetry in B⁰_s → D_s^∓K^± decays",
             ),
             (
                 "Study of the decay $B^{\\pm} \\to DK^{*\\pm}$ with two-body $D$ decays",
-                "Study of the decay B^± → DK^*± with two-body D decays",
+                "Study of the decay B^± → DK*^± with two-body D decays",
             ),
             (
                 "Evidence for the rare decay $\\Sigma^+ \\to p \\mu^+ \\mu^-$",
-                "Evidence for the rare decay Σ^+ → p μ^+ μ^-",
+                "Evidence for the rare decay Σ⁺ → p μ⁺ μ⁻",
             ),
             (
                 "Updated limit for the decay $K_{\\rm\\scriptscriptstyle S}^0\\rightarrow\\mu^+\\mu^-$",
-                "Updated limit for the decay K_ S^0 → μ^+μ^-",
+                "Updated limit for the decay K⁰_S → μ⁺μ⁻",
             ),
             (
                 "Search for the rare decays $B^0_{(s)}\\to\\tau^+\\tau^-$",
-                "Search for the rare decays B^0_(s) → τ^+τ^-",
+                "Search for the rare decays B⁰_s → τ⁺τ⁻",
             ),
             (
                 "$CP$-violating asymmetries from the decay-time distribution of prompt $D^0 \\to K^+ K^-$ and $D^0 \\to \\pi^+\\pi^-$ decays in the full $\\mbox{LHCb}$ Run 1 data sample. Measurement using unbinned, acceptance corrected decay-time.",
-                "CP-violating asymmetries from the decay-time distribution of prompt D^0 → K^+ K^- and D^0 → π^+π^- decays in the full LHCb Run 1 data sample. Measurement using unbinned, acceptance corrected decay-time.",
+                "CP-violating asymmetries from the decay-time distribution of prompt D⁰ → K⁺ K⁻ and D⁰ → π⁺π⁻ decays in the full LHCb Run 1 data sample. Measurement using unbinned, acceptance corrected decay-time.",
             ),
             (
                 "$CP$-violating asymmetries from the decay-time distribution of  prompt $D^0 \\to K^+K^-$  and  $D^0 \\to \\pi^+\\pi^-$ decays in the  full LHCb Run~1 data sample. Measurement using yield asymmetries in bins of decay time.",
-                "CP-violating asymmetries from the decay-time distribution of prompt D^0 → K^+K^- and D^0 → π^+π^- decays in the full LHCb Run 1 data sample. Measurement using yield asymmetries in bins of decay time.",
+                "CP-violating asymmetries from the decay-time distribution of prompt D⁰ → K⁺K⁻ and D⁰ → π⁺π⁻ decays in the full LHCb Run 1 data sample. Measurement using yield asymmetries in bins of decay time.",
             ),
             (
                 "Dalitz plot analysis of the  $D^+ \\rightarrow K^- K^+ K^+$ decay with the isobar model",
-                "Dalitz plot analysis of the D^+ → K^- K^+ K^+ decay with the isobar model",
+                "Dalitz plot analysis of the D⁺ → K⁻ K⁺ K⁺ decay with the isobar model",
             ),
             (
                 "Central exclusive production of $J/\\psi$ and $\\psi(2S)$ mesons in pp collisions at $\\sqrt{s}=13$ TeV",
@@ -1320,7 +1320,7 @@ class TestFormatTitle(object):
             ),
             (
                 "Search for $H^0 \\rightarrow b \\bar{b}$ or $c \\bar{c}$ in association with a $W$ or $Z$ boson in the forward region of $pp$ collisions",
-                "Search for H^0 → bb̅ or cc̅ in association with a W or Z boson in the forward region of pp collisions",
+                "Search for H⁰ → bb̅ or cc̅ in association with a W or Z boson in the forward region of pp collisions",
             ),
             (
                 "LHCb dimuon and charm mass distributions",
@@ -1328,28 +1328,28 @@ class TestFormatTitle(object):
             ),
             (
                 "Search for structure in the $B_s^0\\pi^\\pm$ invariant mass spectrum",
-                "Search for structure in the B_s^0π^± invariant mass spectrum",
+                "Search for structure in the B⁰_s π^± invariant mass spectrum",
             ),
             (
                 "Study of cold nuclear matter effects using prompt $D^0$ meson production in $p\\mathrm{Pb}$ collisions at LHCb",
-                "Study of cold nuclear matter effects using prompt D^0 meson production in pPb collisions at LHCb",
+                "Study of cold nuclear matter effects using prompt D⁰ meson production in pPb collisions at LHCb",
             ),
             # LHCb lhcb_paper_feed
             (
                 "Search for $A' \\to \\mu^+ \\mu^-$ decays",
-                "Search for A' → μ^+ μ^- decays",
+                "Search for A' → μ⁺ μ⁻ decays",
             ),
             (
                 "Search for the doubly charmed baryon $\\Xi_{cc}^{+}$",
-                "Search for the doubly charmed baryon Ξ_cc^+",
+                "Search for the doubly charmed baryon Ξ⁺_cc",
             ),
             (
                 "Amplitude analysis of the $B^+ \\to \\pi^+ \\pi^+ \\pi^-$ decay",
-                "Amplitude analysis of the B^+ → π^+ π^+ π^- decay",
+                "Amplitude analysis of the B⁺ → π⁺ π⁺ π⁻ decay",
             ),
             (
                 "Observation of several sources of $CP$ violation in $B^+ \\to \\pi^+ \\pi^+ \\pi^-$ decays",
-                "Observation of several sources of CP violation in B^+ → π^+ π^+ π^- decays",
+                "Observation of several sources of CP violation in B⁺ → π⁺ π⁺ π⁻ decays",
             ),
             (
                 "Measurement of $\\psi(2S)$ production cross-sections in proton-proton collisions at $\\sqrt{s} = 7$ and 13 TeV",
@@ -1357,43 +1357,43 @@ class TestFormatTitle(object):
             ),
             (
                 "Measurement of CP violation in the $B_s^0\\rightarrow\\phi\\phi$ decay and search for the $B^0\\rightarrow\\phi\\phi$ decay",
-                "Measurement of CP violation in the B_s^0 → ϕϕ decay and search for the B^0 → ϕϕ decay",
+                "Measurement of CP violation in the B⁰_s → ϕϕ decay and search for the B⁰ → ϕϕ decay",
             ),
             (
                 "Precision measurement of the $\\Lambda_c^+$, $\\Xi_c^+$ and $\\Xi_c^0$ baryon lifetimes",
-                "Precision measurement of the Λ_c^+, Ξ_c^+ and Ξ_c^0 baryon lifetimes",
+                "Precision measurement of the Λ⁺_c, Ξ⁺_c and Ξ⁰_c baryon lifetimes",
             ),
             (
                 "Observation of the $\\Lambda_b^0\\rightarrow \\chi_{c1}(3872)pK^-$ decay",
-                "Observation of the Λ_b^0 → χ_c1(3872)pK^- decay",
+                "Observation of the Λ⁰_b → χ_c1(3872)pK⁻ decay",
             ),
             (
                 "Updated measurement of time-dependent  CP-violating observables in $B^0_s \\to J/\\psi K^+K^-$ decays",
-                "Updated measurement of time-dependent CP-violating observables in B^0_s → J/ψ K^+K^- decays",
+                "Updated measurement of time-dependent CP-violating observables in B⁰_s → J/ψ K⁺K⁻ decays",
             ),
             (
                 "Measurement of $C\\!P$ observables in the process $B^0 \\to DK^{*0}$ with two- and four-body $D$ decays",
-                "Measurement of CP observables in the process B^0 → DK^*0 with two- and four-body D decays",
+                "Measurement of CP observables in the process B⁰ → DK*⁰ with two- and four-body D decays",
             ),
             (
                 "Amplitude analysis  of $B^\\pm \\to \\pi^\\pm K^+ K^-$ decays",
-                "Amplitude analysis of B^± → π^± K^+ K^- decays",
+                "Amplitude analysis of B^± → π^± K⁺ K⁻ decays",
             ),
             (
                 "Search for the lepton-flavour-violating decays $B^{0}_{s}\\to\\tau^{\\pm}\\mu^{\\mp}$ and $B^{0}\\to\\tau^{\\pm}\\mu^{\\mp}$",
-                "Search for the lepton-flavour-violating decays B^0_s → τ^±μ^∓ and B^0 → τ^±μ^∓",
+                "Search for the lepton-flavour-violating decays B⁰_s → τ^±μ^∓ and B⁰ → τ^±μ^∓",
             ),
             (
                 "Amplitude analysis of the $B^0_{(s)} \\to K^{*0} \\overline{K}^{*0}$ decays and measurement of the branching fraction of the $B^0 \\to K^{*0} \\overline{K}^{*0}$ decay",
-                "Amplitude analysis of the B^0_(s) → K^*0K^*0 decays and measurement of the branching fraction of the B^0 → K^*0K^*0 decay",
+                "Amplitude analysis of the B⁰_s → K*⁰K*⁰ decays and measurement of the branching fraction of the B⁰ → K*⁰K*⁰ decay",
             ),
             (
                 "Measurement of $CP$-violating and mixing-induced observables in $B_s^0 \\to \\phi\\gamma$ decays",
-                "Measurement of CP-violating and mixing-induced observables in B_s^0 → ϕγ decays",
+                "Measurement of CP-violating and mixing-induced observables in B⁰_s → ϕγ decays",
             ),
             (
                 "A search for $\\it{\\Xi}^{++}_{cc} \\rightarrow D^{+} p K^{-} \\pi^{+}$ decays",
-                "A search for Ξ^++_cc → D^+ p K^-π^+ decays",
+                "A search for Ξ⁺⁺_cc → D⁺ p K⁻π⁺ decays",
             ),
             (
                 "Measurement of charged hadron production in $Z$-tagged jets in proton-proton collisions at $\\sqrt{s}=8$ TeV",
@@ -1401,15 +1401,15 @@ class TestFormatTitle(object):
             ),
             (
                 "Observation of a narrow pentaquark state, $P_c(4312)^+$, and of two-peak structure of the $P_c(4450)^+$",
-                "Observation of a narrow pentaquark state, P_c(4312)^+, and of two-peak structure of the P_c(4450)^+",
+                "Observation of a narrow pentaquark state, P⁺_c(4312), and of two-peak structure of the P⁺_c(4450)",
             ),
             (
                 "Measurements of $CP$ asymmetries in charmless four-body $\\Lambda^0_b$ and $\\Xi_b^0$ decays",
-                "Measurements of CP asymmetries in charmless four-body Λ^0_b and Ξ_b^0 decays",
+                "Measurements of CP asymmetries in charmless four-body Λ⁰_b and Ξ⁰_b decays",
             ),
             (
                 "Observation of an excited $B_c^+$ state",
-                "Observation of an excited B_c^+ state",
+                "Observation of an excited B⁺_c state",
             ),
             (
                 "Near-threshold $D\\bar{D}$ spectroscopy and observation of a new charmonium state",
@@ -1417,7 +1417,7 @@ class TestFormatTitle(object):
             ),
             (
                 "Search for lepton-universality violation in $B^+\\to K^+\\ell^+\\ell^-$ decays",
-                "Search for lepton-universality violation in B^+ → K^+ℓ^+ℓ^- decays",
+                "Search for lepton-universality violation in B⁺ → K⁺ℓ⁺ℓ⁻ decays",
             ),
             (
                 "Observation of $C\\!P$ violation in charm decays",
@@ -1425,7 +1425,7 @@ class TestFormatTitle(object):
             ),
             (
                 "Measurement of the $CP$-violating phase $\\phi_s$ from $B_{s}^{0}\\to J/\\psi\\pi^+\\pi^-$ decays in 13 TeV $pp$ collisions",
-                "Measurement of the CP-violating phase ϕ_s from B_s^0 → J/ψπ^+π^- decays in 13 TeV pp collisions",
+                "Measurement of the CP-violating phase ϕ_s from B⁰_s → J/ψπ⁺π⁻ decays in 13 TeV pp collisions",
             ),
             (
                 "Measurement of the mass difference between neutral charm-meson eigenstates",
@@ -1433,16 +1433,16 @@ class TestFormatTitle(object):
             ),
             (
                 "Search for $CP$ violation in $D^+_s\\to K_S^0\\pi^+$, $D^+\\to K_S^0K^+$ and $D^+\\to\\phi\\pi^+$ decays",
-                "Search for CP violation in D^+_s → K_S^0π^+, D^+ → K_S^0K^+ and D^+ → ϕπ^+ decays",
+                "Search for CP violation in D⁺_s → K⁰_S π⁺, D⁺ → K⁰_S K⁺ and D⁺ → ϕπ⁺ decays",
             ),
             # LHCb lhcb_conf_feed
             (
                 "Strong constraints on the $K^0_s \\to \\mu^+ \\mu^-$ branching fraction",
-                "Strong constraints on the K^0_s → μ^+ μ^- branching fraction",
+                "Strong constraints on the K⁰_s → μ⁺ μ⁻ branching fraction",
             ),
             (
                 "Search for time-dependent $CP$ violation in $D^0 \\to K^+ K^-$ and $D^0 \\to \\pi^+ \\pi^-$ decays",
-                "Search for time-dependent CP violation in D^0 → K^+ K^- and D^0 → π^+ π^- decays",
+                "Search for time-dependent CP violation in D⁰ → K⁺ K⁻ and D⁰ → π⁺ π⁻ decays",
             ),
             (
                 "Prospects for searches for long-lived particles after the LHCb detector upgrades",
@@ -1454,11 +1454,11 @@ class TestFormatTitle(object):
             ),
             (
                 "Measurement of $B^+$, $B^0$ and $\\Lambda_b^0$ production and nuclear modification in $p$Pb collisions at $\\sqrt{s_\\mathrm{NN}}=8.16 ~~\\text {TeV}$",
-                "Measurement of B^+, B^0 and Λ_b^0 production and nuclear modification in pPb collisions at √(s_NN) = 8.16 TeV",
+                "Measurement of B⁺, B⁰ and Λ⁰_b production and nuclear modification in pPb collisions at √(s_NN) = 8.16 TeV",
             ),
             (
                 "Study of coherent $J/\\psi$ production in lead-lead collisions at $\\sqrt{s_{\\rm NN}} =5\\ \\rm{TeV}$ with the LHCb experiment",
-                "Study of coherent J/ψ production in lead-lead collisions at √(s_ NN) = 5 TeV with the LHCb experiment",
+                "Study of coherent J/ψ production in lead-lead collisions at √(s_NN) = 5 TeV with the LHCb experiment",
             ),
             (
                 "Update of the LHCb combination of the CKM angle $\\gamma$",
@@ -1466,11 +1466,11 @@ class TestFormatTitle(object):
             ),
             (
                 "Measurement of CP violation in the $B_s^0 \\to \\phi \\phi$ decay and search for the $B^0 \\to \\phi\\phi$ decay",
-                "Measurement of CP violation in the B_s^0 → ϕϕ decay and search for the B^0 → ϕϕ decay",
+                "Measurement of CP violation in the B⁰_s → ϕϕ decay and search for the B⁰ → ϕϕ decay",
             ),
             (
                 "Prompt $\\Lambda^+_{\\mathrm{c}}$ production in $p\\mathrm{Pb}$ collisions at $\\sqrt{s_{_{\\mathrm{NN}}}} = 5.02\\mathrm{\\,Te\\kern -0.1em V}$",
-                "Prompt Λ^+_c production in pPb collisions at √(s_NN) = 5.02 Te -0.1em V",
+                "Prompt Λ⁺_c production in pPb collisions at √(s_NN) = 5.02 TeV",
             ),
             (
                 "Update of the LHCb combination of the CKM angle $\\gamma$ using $B\\to DK$ decays",
@@ -1478,51 +1478,51 @@ class TestFormatTitle(object):
             ),
             (
                 "Measurement of antiproton production in $p$He collisions at $\\sqrt{s_{\\scriptscriptstyle\\rm NN}}=110$ GeV",
-                "Measurement of antiproton production in pHe collisions at √(s_ NN) = 110 GeV",
+                "Measurement of antiproton production in pHe collisions at √(s_NN) = 110 GeV",
             ),
             (
                 "Measurement of $J/\\psi$ and $D^0$ production in $p$Ar collisions at $\\sqrt{s_{NN}}=110$ GeV",
-                "Measurement of J/ψ and D^0 production in pAr collisions at √(s_NN) = 110 GeV",
+                "Measurement of J/ψ and D⁰ production in pAr collisions at √(s_NN) = 110 GeV",
             ),
             (
                 "Measurement of time-dependent $C\\!P$-violating asymmetries in $B^0\\to\\pi^+\\pi^-$ and $B_s^0\\to K^+K^-$ decays at LHCb",
-                "Measurement of time-dependent CP-violating asymmetries in B^0 → π^+π^- and B_s^0 → K^+K^- decays at LHCb",
+                "Measurement of time-dependent CP-violating asymmetries in B⁰ → π⁺π⁻ and B⁰_s → K⁺K⁻ decays at LHCb",
             ),
             (
                 "First observation of a baryonic $B_s^0$ decay",
-                "First observation of a baryonic B_s^0 decay",
+                "First observation of a baryonic B⁰_s decay",
             ),
             (
                 "Measurement of $C\\!P$ asymmetry in $B_s^0\\to D_s^{\\mp}K^{\\pm}$ decays",
-                "Measurement of CP asymmetry in B_s^0 → D_s^∓K^± decays",
+                "Measurement of CP asymmetry in B⁰_s → D_s^∓K^± decays",
             ),
             (
                 "Study of the decay $B^{\\pm} \\to DK^{*\\pm}$ with two-body $D$ decays",
-                "Study of the decay B^± → DK^*± with two-body D decays",
+                "Study of the decay B^± → DK*^± with two-body D decays",
             ),
             (
                 "Evidence for the rare decay $\\Sigma^+ \\to p \\mu^+ \\mu^-$",
-                "Evidence for the rare decay Σ^+ → p μ^+ μ^-",
+                "Evidence for the rare decay Σ⁺ → p μ⁺ μ⁻",
             ),
             (
                 "Updated limit for the decay $K_{\\rm\\scriptscriptstyle S}^0\\rightarrow\\mu^+\\mu^-$",
-                "Updated limit for the decay K_ S^0 → μ^+μ^-",
+                "Updated limit for the decay K⁰_S → μ⁺μ⁻",
             ),
             (
                 "Search for the rare decays $B^0_{(s)}\\to\\tau^+\\tau^-$",
-                "Search for the rare decays B^0_(s) → τ^+τ^-",
+                "Search for the rare decays B⁰_s → τ⁺τ⁻",
             ),
             (
                 "$CP$-violating asymmetries from the decay-time distribution of prompt $D^0 \\to K^+ K^-$ and $D^0 \\to \\pi^+\\pi^-$ decays in the full $\\mbox{LHCb}$ Run 1 data sample. Measurement using unbinned, acceptance corrected decay-time.",
-                "CP-violating asymmetries from the decay-time distribution of prompt D^0 → K^+ K^- and D^0 → π^+π^- decays in the full LHCb Run 1 data sample. Measurement using unbinned, acceptance corrected decay-time.",
+                "CP-violating asymmetries from the decay-time distribution of prompt D⁰ → K⁺ K⁻ and D⁰ → π⁺π⁻ decays in the full LHCb Run 1 data sample. Measurement using unbinned, acceptance corrected decay-time.",
             ),
             (
                 "$CP$-violating asymmetries from the decay-time distribution of  prompt $D^0 \\to K^+K^-$  and  $D^0 \\to \\pi^+\\pi^-$ decays in the  full LHCb Run~1 data sample. Measurement using yield asymmetries in bins of decay time.",
-                "CP-violating asymmetries from the decay-time distribution of prompt D^0 → K^+K^- and D^0 → π^+π^- decays in the full LHCb Run 1 data sample. Measurement using yield asymmetries in bins of decay time.",
+                "CP-violating asymmetries from the decay-time distribution of prompt D⁰ → K⁺K⁻ and D⁰ → π⁺π⁻ decays in the full LHCb Run 1 data sample. Measurement using yield asymmetries in bins of decay time.",
             ),
             (
                 "Dalitz plot analysis of the  $D^+ \\rightarrow K^- K^+ K^+$ decay with the isobar model",
-                "Dalitz plot analysis of the D^+ → K^- K^+ K^+ decay with the isobar model",
+                "Dalitz plot analysis of the D⁺ → K⁻ K⁺ K⁺ decay with the isobar model",
             ),
             (
                 "Central exclusive production of $J/\\psi$ and $\\psi(2S)$ mesons in pp collisions at $\\sqrt{s}=13$ TeV",
@@ -1530,7 +1530,7 @@ class TestFormatTitle(object):
             ),
             (
                 "Search for $H^0 \\rightarrow b \\bar{b}$ or $c \\bar{c}$ in association with a $W$ or $Z$ boson in the forward region of $pp$ collisions",
-                "Search for H^0 → bb̅ or cc̅ in association with a W or Z boson in the forward region of pp collisions",
+                "Search for H⁰ → bb̅ or cc̅ in association with a W or Z boson in the forward region of pp collisions",
             ),
         ],
     )
