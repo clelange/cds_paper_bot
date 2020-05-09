@@ -963,6 +963,13 @@ def main():
                     )
                 if tweet_response:
                     store_id(identifier, post["feed_id"])
+            else:
+                logger.info(title_formatted)
+                logger.info("identifier: " + identifier)
+                logger.info("link: " + link)
+                logger.info("type_hashtag: " + type_hashtag)
+                logger.info("conf_hashtags: " + conf_hashtags)
+                logger.info("phys_hashtags: " + phys_hashtags)
         else:
             logger.info("No media found! Skipping entry.")
 
