@@ -130,7 +130,12 @@ def format_title(title):
     logger.info("Formatting title.")
     logger.info(title)
     title = title.replace("\\sqrt s", "\\sqrt{s}")
+    title = title.replace(" sqrts ", " \\sqrt{s} ")
     title = title.replace(" \\bar{", "\\bar{")
+    title = title.replace("\\smash[b]", "")
+    title = title.replace("\\smash [b]", "")
+    title = title.replace("\\mbox{", "{")
+    title = title.replace("$~\\mathrm{", "~$\\mathrm{")
     if re.search(r"rightarrow\S", title):
         title = title.replace("rightarrow", "rightarrow ")
     # fix overline without space
@@ -145,7 +150,7 @@ def format_title(title):
     except LatexWalkerError as identifier:
         logger.error(identifier)
         text_title = title
-    logger.debug(text_title)
+    logger.error(text_title)
     # insert spaces before and after the following characters
     char_with_spaces = ["=", "→"]
     for my_char in char_with_spaces:
