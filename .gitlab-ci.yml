@@ -18,9 +18,6 @@ update_repo:
   stage: update
   only:
     - web
-  image: $CI_REGISTRY_IMAGE
-  before_script:
-    - ./.gitlab/before_script.sh
   script:
     - ./.gitlab/update_repo.sh
 
