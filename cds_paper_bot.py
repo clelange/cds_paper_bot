@@ -68,7 +68,10 @@ class Conference(object):
 
 
 CONFERENCES = []
-# CONFERENCES.append(Conference("Moriond", maya.parse(f'{maya.now().year}-03-09'), maya.parse(f'{maya.now().year}-04-05')))
+CONFERENCES.append(
+    Conference("Moriond", maya.parse(f'{maya.now().year}-03-18'),
+               maya.parse(f'{maya.now().year}-04-06'))
+)
 CONFERENCES.append(
     Conference("EPSHEP2019", maya.parse("2019-07-08"), maya.parse("2019-07-17"))
 )
