@@ -78,10 +78,10 @@ CONFERENCES.append(
                maya.parse(f'{maya.now().year}-04-06'))
 )
 CONFERENCES.append(
-    Conference("EPSHEP2019", maya.parse("2019-07-08"), maya.parse("2019-07-17"))
+    Conference("EPSHEP2021", maya.parse("2021-07-19"), maya.parse("2021-08-03"))
 )
 CONFERENCES.append(
-    Conference("LeptonPhoton19", maya.parse("2019-08-03"), maya.parse("2019-08-10"))
+    Conference("LeptonPhoton21", maya.parse("2021-08-04"), maya.parse("2021-08-18"))
 )
 CONFERENCES.append(
     Conference("topq2019", maya.parse("2019-09-20"), maya.parse("2019-09-28"))
@@ -93,7 +93,7 @@ CONFERENCES.append(
     Conference("QM2019", maya.parse("2019-11-01"), maya.parse("2019-11-12"))
 )
 CONFERENCES.append(
-    Conference("LHCP2020", maya.parse("2020-05-18"), maya.parse("2020-06-06"))
+    Conference("LHCP2021", maya.parse("2021-06-01"), maya.parse("2021-06-16"))
 )
 CONFERENCES.append(
     Conference("ICHEP2020", maya.parse("2020-07-21"), maya.parse("2020-08-13"))
