@@ -43,6 +43,11 @@ CADI_TO_HASHTAG["SMP"] = "#StandardModel"
 CADI_TO_HASHTAG["BPH"] = "#BPhysics"
 CADI_TO_HASHTAG["JME"] = "#Jets"
 CADI_TO_HASHTAG["BTV"] = "#FlavourTagging"
+CADI_TO_HASHTAG["MUO"] = "#Muons"
+CADI_TO_HASHTAG["TAU"] = "#Taus #TauLeptons"
+CADI_TO_HASHTAG["EGM"] = "#Electrons #Photons"
+CADI_TO_HASHTAG["LUM"] = "#Luminosity"
+CADI_TO_HASHTAG["PRF"] = "#ParticleFlow"
 
 # identifiers for preliminary results
 PRELIM = ["CMS-PAS", "ATLAS-CONF", "LHCb-CONF"]
