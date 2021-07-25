@@ -78,7 +78,7 @@ CONFERENCES.append(
                maya.parse(f'{maya.now().year}-04-06'))
 )
 CONFERENCES.append(
-    Conference("EPSHEP21", maya.parse("2021-07-19"), maya.parse("2021-08-03"))
+    Conference("EPSHEP2021", maya.parse("2021-07-19"), maya.parse("2021-08-03"))
 )
 CONFERENCES.append(
     Conference("LeptonPhoton21", maya.parse("2021-08-04"), maya.parse("2021-08-18"))
