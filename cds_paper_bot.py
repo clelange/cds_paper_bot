@@ -643,6 +643,10 @@ def main():
     )
     parser.add_argument("-g", "--nogif", help="do not create GIF", action="store_true")
     parser.add_argument(
+        "-f", "--figmax", help="maximum number of figures to use for GIF", type=int,
+        default=20
+    )
+    parser.add_argument(
         "-e", "--experiment", help="experiment to tweet for", type=str, default="CMS"
     )
     parser.add_argument(
@@ -658,6 +662,7 @@ def main():
     parser.add_argument("--arXiv", help="use arXiv link", action="store_true")
     args = parser.parse_args()
     max_tweets = args.max
+    max_figures = args.figmax
     if args.dry:
         dry_run = True
     if args.keep:
@@ -712,6 +717,7 @@ def main():
         feed_entries, key=lambda x: maya.parse(x["published"]).datetime()
     ):
         downloaded_image_list = []
+        n_figures = 0
         downloaded_doc_list = []
         logger.debug(post)
         identifier = post["dc_source"]
@@ -809,9 +815,12 @@ def main():
                     if media_isimage:
                         downloaded_image_list.append(out_path)
                         logger.debug("image: " + out_path + " downloaded!")
+                        n_figures += 1
                     else:
                         downloaded_doc_list.append(out_path)
                         logger.debug("doc: " + out_path + " downloaded!")
+            if n_figures >= max_figures:
+                break
 
         # ATLAS notes workaround
         if experiment == "ATLAS" and len(downloaded_image_list) == 0:
