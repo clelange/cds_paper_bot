@@ -193,6 +193,8 @@ def convert_to_unicode(text):
     unicode_text = unicode_text.replace("^0", "⁰")
     unicode_text = unicode_text.replace("_0", "₀")
     unicode_text = unicode_text.replace("^*", "*")
+    # Remove parentheses for pp centre-of-mass energy
+    unicode_text = unicode_text.replace("√(s)", "√s")
     return unicode_text
 
 
