@@ -917,7 +917,7 @@ def main():
             # but the submission happens days before the analysis appears on arXiv
             # while the CDS entry with the arXiv identifier comes after the
             # availability on arXiv, so let's give people a heads-up of what's coming.
-            if experiment == "CMS" and identifier.startswith("CERN-EP"):
+            if (experiment == "CMS" or experiment == "LHCb") and identifier.startswith("CERN-EP"):
                 type_hashtag += " soon on arXiv"
 
         title_formatted = format_title(title)
