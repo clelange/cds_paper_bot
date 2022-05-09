@@ -1,6 +1,7 @@
 # ignore authentication file
 auth.ini
 .DS_Store
+.direnv
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
