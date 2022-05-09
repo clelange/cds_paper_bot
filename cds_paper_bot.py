@@ -74,8 +74,11 @@ class Conference(object):
 
 CONFERENCES = []
 CONFERENCES.append(
-    Conference("Moriond", maya.parse(f'{maya.now().year}-03-18'),
-               maya.parse(f'{maya.now().year}-04-06'))
+    Conference(
+        "Moriond",
+        maya.parse(f"{maya.now().year}-03-18"),
+        maya.parse(f"{maya.now().year}-04-06"),
+    )
 )
 CONFERENCES.append(
     Conference("EPSHEP2021", maya.parse("2021-07-19"), maya.parse("2021-08-03"))
@@ -84,19 +87,25 @@ CONFERENCES.append(
     Conference("LeptonPhoton21", maya.parse("2021-08-04"), maya.parse("2021-08-18"))
 )
 CONFERENCES.append(
-    Conference("topq2019", maya.parse("2019-09-20"), maya.parse("2019-09-28"))
+    Conference("topq2022", maya.parse("2022-09-03"), maya.parse("2022-09-13"))
 )
 CONFERENCES.append(
     Conference("HiggsCouplings", maya.parse("2019-09-29"), maya.parse("2019-10-06"))
 )
 CONFERENCES.append(
+    Conference("Higgs2022", maya.parse("2022-11-06"), maya.parse("2022-11-16"))
+)
+CONFERENCES.append(
     Conference("QM2019", maya.parse("2019-11-01"), maya.parse("2019-11-12"))
 )
 CONFERENCES.append(
-    Conference("LHCP2021", maya.parse("2021-06-01"), maya.parse("2021-06-16"))
+    Conference("LHCP2022", maya.parse("2022-05-15"), maya.parse("2022-05-25"))
 )
 CONFERENCES.append(
-    Conference("ICHEP2020", maya.parse("2020-07-21"), maya.parse("2020-08-13"))
+    Conference("ICHEP2022", maya.parse("2022-07-06"), maya.parse("2022-07-17"))
+)
+CONFERENCES.append(
+    Conference("BOOST2022", maya.parse("2022-08-14"), maya.parse("2022-08-24"))
 )
 
 daiquiri.setup(level=logging.INFO)
@@ -645,8 +654,11 @@ def main():
     )
     parser.add_argument("-g", "--nogif", help="do not create GIF", action="store_true")
     parser.add_argument(
-        "-f", "--figmax", help="maximum number of figures to use for GIF", type=int,
-        default=20
+        "-f",
+        "--figmax",
+        help="maximum number of figures to use for GIF",
+        type=int,
+        default=20,
     )
     parser.add_argument(
         "-e", "--experiment", help="experiment to tweet for", type=str, default="CMS"
@@ -917,7 +929,9 @@ def main():
             # but the submission happens days before the analysis appears on arXiv
             # while the CDS entry with the arXiv identifier comes after the
             # availability on arXiv, so let's give people a heads-up of what's coming.
-            if (experiment == "CMS" or experiment == "LHCb") and identifier.startswith("CERN-EP"):
+            if (experiment == "CMS" or experiment == "LHCb") and identifier.startswith(
+                "CERN-EP"
+            ):
                 type_hashtag += " soon on arXiv"
 
         title_formatted = format_title(title)
