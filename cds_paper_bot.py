@@ -76,36 +76,36 @@ CONFERENCES = []
 CONFERENCES.append(
     Conference(
         "Moriond",
-        maya.parse(f"{maya.now().year}-03-18"),
-        maya.parse(f"{maya.now().year}-04-06"),
+        maya.parse(f"{maya.now().year}-03-23"),
+        maya.parse(f"{maya.now().year}-04-11"),
     )
 )
 CONFERENCES.append(
-    Conference("EPSHEP2021", maya.parse("2021-07-19"), maya.parse("2021-08-03"))
+    Conference("EPSHEP2023", maya.parse("2023-08-20"), maya.parse("2023-08-30"))
 )
 CONFERENCES.append(
-    Conference("LeptonPhoton21", maya.parse("2021-08-04"), maya.parse("2021-08-18"))
+    Conference("LeptonPhoton23", maya.parse("2023-07-16"), maya.parse("2023-07-26"))
 )
 CONFERENCES.append(
-    Conference("topq2022", maya.parse("2022-09-03"), maya.parse("2022-09-13"))
+    Conference("topq2023", maya.parse("2023-09-23"), maya.parse("2023-10-03"))
 )
 CONFERENCES.append(
     Conference("HiggsCouplings", maya.parse("2019-09-29"), maya.parse("2019-10-06"))
 )
 CONFERENCES.append(
-    Conference("Higgs2022", maya.parse("2022-11-06"), maya.parse("2022-11-16"))
+    Conference("Higgs2023", maya.parse("2023-11-26"), maya.parse("2023-12-06"))
 )
 CONFERENCES.append(
-    Conference("QM2019", maya.parse("2019-11-01"), maya.parse("2019-11-12"))
+    Conference("QM2023", maya.parse("2023-09-01"), maya.parse("2023-09-11"))
 )
 CONFERENCES.append(
-    Conference("LHCP2022", maya.parse("2022-05-15"), maya.parse("2022-05-25"))
+    Conference("LHCP2023", maya.parse("2023-05-21"), maya.parse("2023-05-31"))
 )
 CONFERENCES.append(
-    Conference("ICHEP2022", maya.parse("2022-07-06"), maya.parse("2022-07-17"))
+    Conference("ICHEP2024", maya.parse("2024-07-16"), maya.parse("2024-07-26"))
 )
 CONFERENCES.append(
-    Conference("BOOST2022", maya.parse("2022-08-14"), maya.parse("2022-08-24"))
+    Conference("BOOST2023", maya.parse("2023-07-30"), maya.parse("2023-08-09"))
 )
 
 daiquiri.setup(level=logging.INFO)
