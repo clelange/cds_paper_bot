@@ -99,10 +99,7 @@ CONFERENCES.append(
     Conference("QM2023", maya.parse("2023-09-01"), maya.parse("2023-09-11"))
 )
 CONFERENCES.append(
-    Conference("LHCP2023", maya.parse("2023-05-21"), maya.parse("2023-05-31"))
-)
-CONFERENCES.append(
-    Conference("LHCP", maya.parse("2023-05-21"), maya.parse("2023-05-31"))
+    Conference("LHCP #LHCP2023", maya.parse("2023-05-19"), maya.parse("2023-05-31"))
 )
 CONFERENCES.append(
     Conference("ICHEP2024", maya.parse("2024-07-16"), maya.parse("2024-07-26"))
