@@ -1,4 +1,4 @@
-FROM ubuntu:18.04
+FROM ubuntu:jammy
 
 ENV MAGICK_HOME=/usr
 
@@ -9,6 +9,7 @@ ENV PACKAGES="\
   python3-dev \
   python3-pip \
   bash \
+  imagemagick \
   imagemagick-common \
   libmagickwand-dev \
   libpng-dev \

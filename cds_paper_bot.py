@@ -16,12 +16,11 @@ import feedparser
 import lxml.html as lh
 from pylatexenc.latexwalker import LatexWalkerError
 from pylatexenc.latex2text import LatexNodes2Text
-from twython import Twython, TwythonError
+import tweepy
 import maya
 import requests
 from wand.image import Image, Color
 from wand.exceptions import CorruptImageError  # pylint: disable=no-name-in-module
-import imageio
 
 # Maximum image dimension (both x and y)
 MAX_IMG_DIM = 1000  # was 1200
@@ -48,6 +47,7 @@ CADI_TO_HASHTAG["TAU"] = "#Taus #TauLeptons"
 CADI_TO_HASHTAG["EGM"] = "#Electrons #Photons"
 CADI_TO_HASHTAG["LUM"] = "#Luminosity"
 CADI_TO_HASHTAG["PRF"] = "#ParticleFlow"
+CADI_TO_HASHTAG["HIN"] = "#HeavyIons"
 
 # identifiers for preliminary results
 PRELIM = ["CMS-PAS", "ATLAS-CONF", "LHCb-CONF"]
@@ -110,7 +110,28 @@ CONFERENCES.append(
 
 daiquiri.setup(level=logging.INFO)
 logger = daiquiri.getLogger()  # pylint: disable=invalid-name
-# imageio.plugins.freeimage.download()
+
+def get_twitter_conn_v1(api_key, api_secret, access_token, access_token_secret) -> tweepy.API:
+    """Get twitter conn 1.1"""
+
+    auth = tweepy.OAuth1UserHandler(api_key, api_secret)
+    auth.set_access_token(
+        access_token,
+        access_token_secret,
+    )
+    return tweepy.API(auth)
+
+def get_twitter_conn_v2(api_key, api_secret, access_token, access_token_secret) -> tweepy.Client:
+    """Get twitter conn 2.0"""
+
+    client = tweepy.Client(
+        consumer_key=api_key,
+        consumer_secret=api_secret,
+        access_token=access_token,
+        access_token_secret=access_token_secret,
+    )
+
+    return client
 
 
 def read_feed(rss_url):
@@ -283,14 +304,14 @@ def execute_command(command):
 
 
 def process_images(
-    identifier, downloaded_image_list, post_gif, use_wand=True, use_imageio=True
+    identifier, downloaded_image_list, post_gif, use_wand=True
 ):
     """Convert/resize all images to png."""
     logger.info("Processing %d images." % len(downloaded_image_list))
     logger.debug(
         "process_images(): identifier = {}, downloaded_image_list = {},\
-                  use_wand = {}, use_imageio = {}".format(
-            identifier, downloaded_image_list, use_wand, use_imageio
+                  use_wand = {}".format(
+            identifier, downloaded_image_list, use_wand
         )
     )
     image_list = []
@@ -381,29 +402,16 @@ def process_images(
                     top = int((max_dim[1] * add_margin - foreground.size[1]) / 2)
                     out.composite(foreground, left=left, top=top)
                     out.save(filename=image_file)
-            if use_imageio:
-                images_for_gif.append(imageio.imread(image_file))
-            else:
-                images_for_gif.append(image_file)
+            images_for_gif.append(image_file)
         img_size = MAX_IMG_SIZE + 1
         # the gif can only have a certain size, so we loop until it's small enough
         while img_size > MAX_IMG_SIZE:
-            if use_imageio:
-                imageio.mimsave(
-                    "{id}/{id}.gif".format(id=identifier),
-                    images_for_gif,
-                    format="GIF-FI",
-                    duration=2,
-                    quantizer="nq",
-                    palettesize=256,
-                )
-            else:
-                command = "convert -delay 200 -loop 0 "
-                # command = "gifsicle --delay=120 --loop "
-                command += " ".join(images_for_gif)
-                command += " {id}/{id}.gif".format(id=identifier)
-                # command += ' > {id}/{id}.gif'.format(id=identifier)
-                execute_command(command)
+            command = "convert -delay 200 -loop 0 "
+            # command = "gifsicle --delay=120 --loop "
+            command += " ".join(images_for_gif)
+            command += " {id}/{id}.gif".format(id=identifier)
+            # command += ' > {id}/{id}.gif'.format(id=identifier)
+            execute_command(command)
             img_size = os.path.getsize("{id}/{id}.gif".format(id=identifier))
             if img_size > MAX_IMG_SIZE:
                 images_for_gif = images_for_gif[:-1]
@@ -420,18 +428,27 @@ def process_images(
 
 def twitter_auth(auth_dict):
     """Authenticate to twitter."""
+    twitter_client_v1 = None
+    twitter_client_v2 = None
     try:
-        twitter = Twython(
-            auth_dict["CONSUMER_KEY"],
-            auth_dict["CONSUMER_SECRET"],
-            auth_dict["ACCESS_TOKEN"],
-            auth_dict["ACCESS_TOKEN_SECRET"],
+        twitter_client_v1 = get_twitter_conn_v1(
+            api_key=auth_dict["CONSUMER_KEY"],
+            api_secret=auth_dict["CONSUMER_SECRET"],
+            access_token=auth_dict["ACCESS_TOKEN"],
+            access_token_secret=auth_dict["ACCESS_TOKEN_SECRET"],
         )
-    except TwythonError as twython_error:
-        print(twython_error)
-        logger.error(twitter)
+        twitter_client_v2 = get_twitter_conn_v2(
+            api_key=auth_dict["CONSUMER_KEY"],
+            api_secret=auth_dict["CONSUMER_SECRET"],
+            access_token=auth_dict["ACCESS_TOKEN"],
+            access_token_secret=auth_dict["ACCESS_TOKEN_SECRET"],
+        )
+    except tweepy.TweepyException as tweepy_exception:
+        print(tweepy_exception)
+        logger.error(twitter_client_v1)
+        logger.error(twitter_client_v2)
         sys.exit(1)
-    return twitter
+    return { "v1": twitter_client_v1, "v2": twitter_client_v2 }
 
 
 def load_config(experiment, feed_file, auth_file):
@@ -441,7 +458,7 @@ def load_config(experiment, feed_file, auth_file):
     # load the feed config
     config.read(feed_file)
     if experiment not in config.sections():
-        logger.error("Experiment {} not found in {}".format(experiment, feed_file))
+        logger.error(f"Experiment {experiment} not found in {feed_file}")
     config_dict["FEED_DICT"] = {}
     for key in config[experiment]:
         config_dict["FEED_DICT"][key.upper()] = config[experiment][key]
@@ -462,31 +479,30 @@ def upload_images(twitter, image_list, post_gif):
     image_ids = []
     # loop over sorted images to get the plots in the right order
     for image_path in sorted(image_list):
-        with open(image_path, "rb") as image:
-            response = None
-            if post_gif:
-                if image_path.endswith("gif"):
-                    try:
-                        # while media_category="tweet_gif" should be used, this breaks the gif...
-                        # response = twitter.upload_media(media=image,
-                        # media_category="tweet_gif")
-                        response = twitter.upload_media(media=image)
-                    except TwythonError as twython_error:
-                        print(twython_error)
-                        logger.error(response)
-                        sys.exit(1)
-                    logger.info(response)
-                    image_ids.append(response["media_id"])
-            else:
+        response = None
+        if post_gif:
+            if image_path.endswith("gif"):
                 try:
-                    response = twitter.upload_media(media=image)
-                except TwythonError as twython_error:
-                    print(twython_error)
+                    # while media_category="tweet_gif" should be used, this breaks the gif...
+                    # response = twitter.media_upload(filename=image_path,
+                    # media_category="tweet_gif")
+                    response = twitter.media_upload(filename=image_path)
+                except tweepy.TweepyException as tweepy_exception:
+                    print(tweepy_exception)
                     logger.error(response)
                     sys.exit(1)
-                logger.debug(response)
-                image_ids.append(response["media_id"])
-    logger.debug(image_ids)
+                logger.info(response)
+                image_ids.append(response.media_id)
+        else:
+            try:
+                response = twitter.media_upload(filename=image_path)
+            except tweepy.TweepyException as tweepy_exception:
+                print(tweepy_exception)
+                logger.error(response)
+                sys.exit(1)
+            logger.info(response)
+            image_ids.append(response.media_id)
+    logger.info(image_ids)
     return image_ids
 
 
@@ -574,34 +590,34 @@ def tweet(
         if post_gif:
             if first_message:
                 try:
-                    response = twitter.update_status(
+                    response = twitter.create_tweet(
                         status=message, media_ids=image_ids
                     )
-                except TwythonError as twython_error:
-                    print(twython_error)
+                except tweepy.TweepyException as tweepy_exception:
+                    print(tweepy_exception)
                     logger.error(response)
                     sys.exit(1)
                 first_message = False
                 logger.debug(response)
             else:
                 try:
-                    response = twitter.update_status(
+                    response = twitter.create_tweet(
                         status=message, in_reply_to_status_id=previous_status_id
                     )
-                except TwythonError as twython_error:
-                    print(twython_error)
+                except tweepy.TweepyException as tweepy_exception:
+                    print(tweepy_exception)
                     logger.error(response)
                     return None
                 logger.debug(response)
         else:
             try:
-                response = twitter.update_status(
+                response = twitter.create_tweet(
                     status=message,
                     media_ids=image_ids[i * 4 : (i + 1) * 4],
                     in_reply_to_status_id=previous_status_id,
                 )
-            except TwythonError as twython_error:
-                print(twython_error)
+            except tweepy.TweepyException as tweepy_exception:
+                print(tweepy_exception)
                 logger.error(response)
                 return None
             logger.debug(response)
@@ -896,7 +912,7 @@ def main():
         image_ids = []
         if downloaded_image_list:
             image_list = process_images(outdir, downloaded_image_list, post_gif)
-            image_ids = upload_images(twitter, image_list, post_gif)
+            image_ids = upload_images(twitter['v1'], image_list, post_gif)
 
         title = post.title
         link = post.link
@@ -943,10 +959,10 @@ def main():
 
         # skip entries without media for ATLAS
         if downloaded_image_list or experiment != "ATLAS":
+            tweet_count += 1
             if not dry_run:
-                tweet_count += 1
                 tweet_response = tweet(
-                    twitter,
+                    twitter['v2'],
                     type_hashtag,
                     title_formatted,
                     identifier,
@@ -967,15 +983,16 @@ def main():
                                 outdir, downloaded_image_list, post_gif=False
                             )
                             image_ids = upload_images(
-                                twitter, image_list, post_gif=False
+                                twitter['v1'], image_list, post_gif=False
                             )
                             tweet_response = tweet(
-                                twitter,
+                                twitter['v2'],
                                 type_hashtag,
                                 title_formatted,
                                 identifier,
                                 link,
                                 conf_hashtags,
+                                phys_hashtags,
                                 image_ids,
                                 post_gif=False,
                                 bot_handle=config["AUTH"]["BOT_HANDLE"],
@@ -984,12 +1001,13 @@ def main():
                     # second, try to tweet without image
                     logger.info("Trying to tweet without images")
                     tweet_response = tweet(
-                        twitter,
+                        twitter['v2'],
                         type_hashtag,
                         title_formatted,
                         identifier,
                         link,
                         conf_hashtags,
+                        phys_hashtags,
                         image_ids=[],
                         post_gif=False,
                         bot_handle=config["AUTH"]["BOT_HANDLE"],
