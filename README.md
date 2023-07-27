@@ -27,6 +27,9 @@ For information on running the bot, do
 python cds_paper_bot.py --help
 ```
 
+Note: if this doesn't work on MacOS, make sure to `brew install freetype imagemagick`
+and `export MAGICK_HOME=/opt/homebrew/opt/imagemagick`.
+
 ## Docker image
 
 If you would like to run the bot in an isolated environment, e.g. on a Raspberry Pi, you can try to use the [Dockerfile](Dockerfile).
