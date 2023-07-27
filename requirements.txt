@@ -1,9 +1,8 @@
-daiquiri==2.1.1
-feedparser==6.0.8
-pylatexenc==2.3
+daiquiri==3.2.1
+feedparser==6.0.10
+lxml==4.9.3
 maya==0.6.1
-requests==2.23.0
-Wand==0.5.9
-imageio==2.8.0
-twython==3.8.2
-lxml==4.9.1
+pylatexenc==2.10
+requests==2.31.0
+tweepy==4.14.0
+Wand==0.6.11
