@@ -591,7 +591,7 @@ def tweet(
             if first_message:
                 try:
                     response = twitter.create_tweet(
-                        status=message, media_ids=image_ids
+                        text=message, media_ids=image_ids
                     )
                 except tweepy.TweepyException as tweepy_exception:
                     print(tweepy_exception)
@@ -602,7 +602,7 @@ def tweet(
             else:
                 try:
                     response = twitter.create_tweet(
-                        status=message, in_reply_to_status_id=previous_status_id
+                        text=message, in_reply_to_tweet_id=previous_status_id
                     )
                 except tweepy.TweepyException as tweepy_exception:
                     print(tweepy_exception)
