@@ -590,9 +590,14 @@ def tweet(
         if post_gif:
             if first_message:
                 try:
-                    response = twitter.create_tweet(
-                        text=message, media_ids=image_ids
-                    )
+                    if image_ids:
+                        response = twitter.create_tweet(
+                            text=message, media_ids=image_ids
+                        )
+                    else:
+                        response = twitter.create_tweet(
+                            text=message
+                        )
                 except tweepy.TweepyException as tweepy_exception:
                     print(tweepy_exception)
                     logger.error(response)
@@ -611,11 +616,17 @@ def tweet(
                 logger.debug(response)
         else:
             try:
-                response = twitter.create_tweet(
-                    status=message,
-                    media_ids=image_ids[i * 4 : (i + 1) * 4],
-                    in_reply_to_status_id=previous_status_id,
-                )
+                if image_ids:
+                    response = twitter.create_tweet(
+                        status=message,
+                        media_ids=image_ids[i * 4 : (i + 1) * 4],
+                        in_reply_to_status_id=previous_status_id,
+                    )
+                else:
+                    response = twitter.create_tweet(
+                        status=message,
+                        in_reply_to_status_id=previous_status_id,
+                    )
             except tweepy.TweepyException as tweepy_exception:
                 print(tweepy_exception)
                 logger.error(response)
