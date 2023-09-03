@@ -37,11 +37,15 @@ Each bot/account will need some specific settings, and the following steps will 
 
 Now add a couple of variables, see [feeds.ini](https://github.com/clelange/cds_paper_bot/blob/master/feeds.ini) for a list of experiments already predefined:
 
-| Variable name         | Description                                                 |
-| --------------------- | ----------------------------------------------------------- |
-| `EXPERIMENT`          | name of the experiment, e.g. `ATLAS`                        |
-| `BOT_HANDLE`          | Your twitter account handle without @, e.g. `ATLAS_results` |
-| `CONSUMER_KEY`        | The Twitter "Consumer API key" generated above              |
-| `CONSUMER_SECRET`     | The Twitter "Consumer API secret key" generated above       |
-| `ACCESS_TOKEN`        | The Twitter "Access token" generated above                  |
-| `ACCESS_TOKEN_SECRET` | The Twitter "Access token secret" generated above           |
+| Variable name           | Description                                                  |
+| ----------------------- | ------------------------------------------------------------ |
+| `EXPERIMENT`            | name of the experiment, e.g. `ATLAS`                         |
+| `BOT_HANDLE`            | Your twitter account handle without @, e.g. `ATLAS_results`  |
+| `CONSUMER_KEY`          | The Twitter "Consumer API key" generated above               |
+| `CONSUMER_SECRET`       | The Twitter "Consumer API secret key" generated above        |
+| `ACCESS_TOKEN`          | The Twitter "Access token" generated above                   |
+| `ACCESS_TOKEN_SECRET`   | The Twitter "Access token secret" generated above            |
+| `MASTODON_BOT_HANDLE`   | Your Mastodon account handle, e.g. `@cmspapers@botsin.space` |
+| `MASTODON_ACCESS_TOKEN` | Mastodon app "Access token"                                  |
+
+You can either set both Twitter/X and Mastodon values or only one of them.
