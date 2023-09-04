@@ -1,6 +1,7 @@
 daiquiri==3.2.1
 feedparser==6.0.10
 lxml==4.9.3
+Mastodon.py==1.8.1
 maya==0.6.1
 pylatexenc==2.10
 requests==2.31.0

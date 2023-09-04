@@ -17,8 +17,10 @@ import lxml.html as lh
 from pylatexenc.latexwalker import LatexWalkerError
 from pylatexenc.latex2text import LatexNodes2Text
 import tweepy
+import mastodon
 import maya
 import requests
+import time
 from wand.image import Image, Color
 from wand.exceptions import CorruptImageError  # pylint: disable=no-name-in-module
 
@@ -81,7 +83,9 @@ CONFERENCES.append(
     )
 )
 CONFERENCES.append(
-    Conference("EPSHEP2023", maya.parse("2023-08-20"), maya.parse("2023-08-30"))
+    Conference(
+        "EPSHEP2023 EPSHEP23", maya.parse("2023-08-20"), maya.parse("2023-08-30")
+    )
 )
 CONFERENCES.append(
     Conference("LeptonPhoton23", maya.parse("2023-07-16"), maya.parse("2023-07-26"))
@@ -111,7 +115,10 @@ CONFERENCES.append(
 daiquiri.setup(level=logging.INFO)
 logger = daiquiri.getLogger()  # pylint: disable=invalid-name
 
-def get_twitter_conn_v1(api_key, api_secret, access_token, access_token_secret) -> tweepy.API:
+
+def get_twitter_conn_v1(
+    api_key, api_secret, access_token, access_token_secret
+) -> tweepy.API:
     """Get twitter conn 1.1"""
 
     auth = tweepy.OAuth1UserHandler(api_key, api_secret)
@@ -121,7 +128,10 @@ def get_twitter_conn_v1(api_key, api_secret, access_token, access_token_secret) 
     )
     return tweepy.API(auth)
 
-def get_twitter_conn_v2(api_key, api_secret, access_token, access_token_secret) -> tweepy.Client:
+
+def get_twitter_conn_v2(
+    api_key, api_secret, access_token, access_token_secret
+) -> tweepy.Client:
     """Get twitter conn 2.0"""
 
     client = tweepy.Client(
@@ -303,9 +313,7 @@ def execute_command(command):
         logger.debug(result)
 
 
-def process_images(
-    identifier, downloaded_image_list, post_gif, use_wand=True
-):
+def process_images(identifier, downloaded_image_list, post_gif, use_wand=True):
     """Convert/resize all images to png."""
     logger.info("Processing %d images." % len(downloaded_image_list))
     logger.debug(
@@ -430,6 +438,8 @@ def twitter_auth(auth_dict):
     """Authenticate to twitter."""
     twitter_client_v1 = None
     twitter_client_v2 = None
+    if "CONSUMER_KEY" not in auth_dict:
+        return None
     try:
         twitter_client_v1 = get_twitter_conn_v1(
             api_key=auth_dict["CONSUMER_KEY"],
@@ -448,7 +458,29 @@ def twitter_auth(auth_dict):
         logger.error(twitter_client_v1)
         logger.error(twitter_client_v2)
         sys.exit(1)
-    return { "v1": twitter_client_v1, "v2": twitter_client_v2 }
+    return {"v1": twitter_client_v1, "v2": twitter_client_v2}
+
+
+def mastodon_auth(auth_dict):
+    """Authenticate to mastodon."""
+    mastodon_client = None
+    if "MASTODON_ACCESS_TOKEN" not in auth_dict:
+        return None
+    # Extract api_base_url from MASTODON_HANDLE
+    api_base_url = f'https://{auth_dict["MASTODON_BOT_HANDLE"].split("@")[-1]}/'
+    logger.info(
+        f'Using api_base_url: {api_base_url} for {auth_dict["MASTODON_BOT_HANDLE"]}'
+    )
+    try:
+        mastodon_client = mastodon.Mastodon(
+            access_token=auth_dict["MASTODON_ACCESS_TOKEN"],
+            api_base_url=api_base_url,
+        )
+    except Exception as mastodon_exception:  # pylint: disable=broad-except
+        print(mastodon_exception)
+        logger.error(mastodon_client)
+        sys.exit(1)
+    return mastodon_client
 
 
 def load_config(experiment, feed_file, auth_file):
@@ -473,9 +505,9 @@ def load_config(experiment, feed_file, auth_file):
     return config_dict
 
 
-def upload_images(twitter, image_list, post_gif):
+def twitter_upload_images(twitter, image_list, post_gif):
     """Upload images to twitter and return locations."""
-    logger.info("Uploading images.")
+    logger.info("Uploading images to Twitter.")
     image_ids = []
     # loop over sorted images to get the plots in the right order
     for image_path in sorted(image_list):
@@ -506,6 +538,42 @@ def upload_images(twitter, image_list, post_gif):
     return image_ids
 
 
+def mastodon_upload_images(mastodon_client, image_list, post_gif):
+    """Upload images to Mastodon and return locations."""
+    logger.info("Uploading images to Mastodon.")
+    image_ids = []
+    # loop over sorted images to get the plots in the right order
+    for image_path in sorted(image_list):
+        response = None
+        if post_gif:
+            if image_path.endswith("gif"):
+                try:
+                    response = mastodon_client.media_post(
+                        media_file=image_path,
+                        description=f'Animated GIF image for {image_path.split("/")[0]}',
+                    )
+                except mastodon.MastodonError as mastodon_exception:
+                    print(mastodon_exception)
+                    logger.error(response)
+                    sys.exit(1)
+                logger.info(response)
+                image_ids.append(response.id)
+        else:
+            try:
+                response = mastodon_client.media_post(
+                    media_file=image_path,
+                    description=f'Image for {image_path.split("/")[0]}',
+                )
+            except mastodon.MastodonError as mastodon_exception:
+                print(mastodon_exception)
+                logger.error(response)
+                sys.exit(1)
+            logger.info(response)
+            image_ids.append(response.id)
+    logger.info(image_ids)
+    return image_ids
+
+
 def split_text(
     type_hashtag,
     title,
@@ -513,7 +581,7 @@ def split_text(
     link,
     conf_hashtags,
     phys_hashtags,
-    tweet_length,
+    post_length,
     bot_handle,
 ):
     """Split tweet into several including hashtags and URL in first one"""
@@ -529,9 +597,9 @@ def split_text(
     first_message = True
     while remaining_text:
         message = remaining_text.lstrip()
-        allowed_length = tweet_length - length_link_and_tags
+        allowed_length = post_length - length_link_and_tags
         if not first_message:
-            allowed_length = tweet_length - len(bot_handle) - 3
+            allowed_length = post_length - len(bot_handle) - 3
             message = bot_handle + " .." + message
         if len(message) > allowed_length:
             # strip message at last whitespace and account for 3 dots
@@ -568,7 +636,7 @@ def tweet(
     # type_hashtag: title (identifier) link conf_hashtags
     logger.info("Creating tweet ...")
     # https://dev.twitter.com/rest/reference/get/help/configuration
-    tweet_length = 280
+    tweet_allowed_length = 280
     message_list = split_text(
         type_hashtag,
         title,
@@ -576,7 +644,7 @@ def tweet(
         link,
         conf_hashtags,
         phys_hashtags,
-        tweet_length,
+        tweet_allowed_length,
         bot_handle,
     )
     first_message = True
@@ -595,9 +663,7 @@ def tweet(
                             text=message, media_ids=image_ids
                         )
                     else:
-                        response = twitter.create_tweet(
-                            text=message
-                        )
+                        response = twitter.create_tweet(text=message)
                 except tweepy.TweepyException as tweepy_exception:
                     print(tweepy_exception)
                     logger.error(response)
@@ -635,9 +701,89 @@ def tweet(
     return response
 
 
-def check_id_exists(identifier, feed_id):
+def toot(
+    mastodon_client,
+    type_hashtag,
+    title,
+    identifier,
+    link,
+    conf_hashtags,
+    phys_hashtags,
+    image_ids,
+    post_gif,
+    bot_handle,
+):
+    """toot the new results with title and link and pictures taking care of length limitations."""
+    # type_hashtag: title (identifier) link conf_hashtags
+    logger.info("Creating toot ...")
+    toot_allowed_length = 500
+    message_list = split_text(
+        type_hashtag,
+        title,
+        identifier,
+        link,
+        conf_hashtags,
+        phys_hashtags,
+        toot_allowed_length,
+        bot_handle,
+    )
+    first_message = True
+    previous_status_id = None
+    response = {}
+    for i, message in enumerate(message_list):
+        logger.info(message)
+        logger.debug(len(message))
+        if "id" in response:
+            previous_status_id = response["id"]
+        if post_gif:
+            if first_message:
+                try:
+                    if image_ids:
+                        response = mastodon_client.status_post(
+                            status=message, media_ids=image_ids
+                        )
+                    else:
+                        response = mastodon_client(status=message.status_post)
+                except mastodon.MastodonError as mastodon_exception:
+                    print(mastodon_exception)
+                    logger.error(response)
+                    return None
+                first_message = False
+                logger.debug(response)
+            else:
+                try:
+                    response = mastodon_client.status_post(
+                        status=message, in_reply_to_id=previous_status_id
+                    )
+                except mastodon.MastodonError as mastodon_exception:
+                    print(mastodon_exception)
+                    logger.error(response)
+                    return None
+                logger.debug(response)
+        else:
+            try:
+                if image_ids:
+                    response = mastodon_client.status_post(
+                        status=message,
+                        media_ids=image_ids[i * 4 : (i + 1) * 4],
+                        in_reply_to_id=previous_status_id,
+                    )
+                else:
+                    response = mastodon_client.status_post(
+                        status=message,
+                        in_reply_to_id=previous_status_id,
+                    )
+            except mastodon.MastodonError as mastodon_exception:
+                print(mastodon_exception)
+                logger.error(response)
+                return None
+            logger.debug(response)
+    return response
+
+
+def check_id_exists(identifier, feed_id, prefix=""):
     """Check with ID of the analysis already exists in text file to avoid tweeting again."""
-    txt_file_name = "%s.txt" % feed_id
+    txt_file_name = f"{prefix}{feed_id}.txt"
     # create file if it doesn't exist yet
     if not os.path.isfile(txt_file_name):
         open(txt_file_name, "a").close()
@@ -648,9 +794,9 @@ def check_id_exists(identifier, feed_id):
     return False
 
 
-def store_id(identifier, feed_id):
+def store_id(identifier, feed_id, prefix=""):
     """Store ID of the analysis in text file to avoid tweeting again."""
-    txt_file_name = "%s.txt" % feed_id
+    txt_file_name = f"{prefix}{feed_id}.txt"
     with open(txt_file_name, "a") as txt_file:
         txt_file.write("%s\n" % identifier)
 
@@ -668,6 +814,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-d", "--dry", help="perform dry run without tweeting", action="store_true"
+    )
+    parser.add_argument(
+        "-v", "--verbose", help="enable verbose output", action="store_true"
     )
     parser.add_argument("-a", "--analysis", help="tweet specific analysis", type=str)
     parser.add_argument(
@@ -706,6 +855,9 @@ def main():
     max_figures = args.figmax
     if args.dry:
         dry_run = True
+    if args.verbose:
+        global logger
+        logger.setLevel(logging.DEBUG)
     if args.keep:
         keep_image_dir = True
     if args.list:
@@ -751,12 +903,17 @@ def main():
                 )
             )
         return
-    twitter = twitter_auth(config["AUTH"])
+    twitter_client = twitter_auth(config["AUTH"])
+    mastodon_client = mastodon_auth(config["AUTH"])
+
     # loop over posts sorted by date
     tweet_count = 0
+    toot_count = 0
     for post in sorted(
         feed_entries, key=lambda x: maya.parse(x["published"]).datetime()
     ):
+        do_toot = True
+        do_tweet = True
         downloaded_image_list = []
         n_figures = 0
         downloaded_doc_list = []
@@ -773,11 +930,26 @@ def main():
                 continue
             else:
                 logger.info("Found %s in feed %s" % (identifier, post["feed_id"]))
-        elif check_id_exists(identifier, post["feed_id"]):
-            logger.debug(
-                "%s has already been tweeted for feed %s"
-                % (identifier, post["feed_id"])
-            )
+        else:
+            if twitter_client:
+                if check_id_exists(identifier, post["feed_id"], prefix="TWITTER_"):
+                    logger.debug(
+                        "%s has already been tweeted for feed %s"
+                        % (identifier, post["feed_id"])
+                    )
+                    do_tweet = False
+            else:
+                do_tweet = False
+            if mastodon_client:
+                if check_id_exists(identifier, post["feed_id"], prefix="MASTODON_"):
+                    logger.debug(
+                        "%s has already been tooted for feed %s"
+                        % (identifier, post["feed_id"])
+                    )
+                    do_toot = False
+            else:
+                do_toot = False
+        if not do_toot and not do_tweet:
             continue
         logger.info(
             "{id} - published: {date}".format(
@@ -920,10 +1092,19 @@ def main():
                 ):
                     downloaded_image_list.append(img_path)
 
-        image_ids = []
+        twitter_image_ids = []
+        mastodon_image_ids = []
         if downloaded_image_list:
             image_list = process_images(outdir, downloaded_image_list, post_gif)
-            image_ids = upload_images(twitter['v1'], image_list, post_gif)
+            if twitter_client:
+                twitter_image_ids = twitter_upload_images(
+                    twitter_client["v1"], image_list, post_gif
+                )
+            if mastodon_client:
+                mastodon_image_ids = mastodon_upload_images(
+                    mastodon_client, image_list, post_gif
+                )
+                logger.debug(mastodon_image_ids)
 
         title = post.title
         link = post.link
@@ -970,75 +1151,105 @@ def main():
 
         # skip entries without media for ATLAS
         if downloaded_image_list or experiment != "ATLAS":
-            tweet_count += 1
-            if not dry_run:
-                tweet_response = tweet(
-                    twitter['v2'],
-                    type_hashtag,
-                    title_formatted,
-                    identifier,
-                    link,
-                    conf_hashtags,
-                    phys_hashtags,
-                    image_ids,
-                    post_gif,
-                    config["AUTH"]["BOT_HANDLE"],
-                )
-                if not tweet_response:
-                    # try to recover since something went wrong
-                    # first, try to use individual images instead of GIF
-                    if post_gif:
-                        if downloaded_image_list:
-                            logger.info("Trying to tweet without GIF")
-                            image_list = process_images(
-                                outdir, downloaded_image_list, post_gif=False
-                            )
-                            image_ids = upload_images(
-                                twitter['v1'], image_list, post_gif=False
-                            )
-                            tweet_response = tweet(
-                                twitter['v2'],
-                                type_hashtag,
-                                title_formatted,
-                                identifier,
-                                link,
-                                conf_hashtags,
-                                phys_hashtags,
-                                image_ids,
-                                post_gif=False,
-                                bot_handle=config["AUTH"]["BOT_HANDLE"],
-                            )
-                if not tweet_response:
-                    # second, try to tweet without image
-                    logger.info("Trying to tweet without images")
+            if twitter_client:
+                tweet_count += 1
+                if not dry_run:
                     tweet_response = tweet(
-                        twitter['v2'],
+                        twitter_client["v2"],
                         type_hashtag,
                         title_formatted,
                         identifier,
                         link,
                         conf_hashtags,
                         phys_hashtags,
-                        image_ids=[],
-                        post_gif=False,
-                        bot_handle=config["AUTH"]["BOT_HANDLE"],
+                        twitter_image_ids,
+                        post_gif,
+                        config["AUTH"]["BOT_HANDLE"],
                     )
-                if tweet_response:
-                    store_id(identifier, post["feed_id"])
-            else:
-                logger.info(title_formatted)
-                logger.info("identifier: " + identifier)
-                logger.info("link: " + link)
-                logger.info("type_hashtag: " + type_hashtag)
-                logger.info("conf_hashtags: " + conf_hashtags)
-                logger.info("phys_hashtags: " + phys_hashtags)
+                    if not tweet_response:
+                        # try to recover since something went wrong
+                        # first, try to use individual images instead of GIF
+                        if post_gif:
+                            if downloaded_image_list:
+                                logger.info("Trying to tweet without GIF")
+                                image_list = process_images(
+                                    outdir, downloaded_image_list, post_gif=False
+                                )
+                                twitter_image_ids = upload_images(
+                                    twitter_client["v1"], image_list, post_gif=False
+                                )
+                                tweet_response = tweet(
+                                    twitter_client["v2"],
+                                    type_hashtag,
+                                    title_formatted,
+                                    identifier,
+                                    link,
+                                    conf_hashtags,
+                                    phys_hashtags,
+                                    twitter_image_ids,
+                                    post_gif=False,
+                                    bot_handle=config["AUTH"]["BOT_HANDLE"],
+                                )
+                    if not tweet_response:
+                        # second, try to tweet without image
+                        logger.info("Trying to tweet without images")
+                        tweet_response = tweet(
+                            twitter_client["v2"],
+                            type_hashtag,
+                            title_formatted,
+                            identifier,
+                            link,
+                            conf_hashtags,
+                            phys_hashtags,
+                            image_ids=[],
+                            post_gif=False,
+                            bot_handle=config["AUTH"]["BOT_HANDLE"],
+                        )
+                    if tweet_response:
+                        store_id(identifier, post["feed_id"], prefix="TWITTER_")
+                else:
+                    logger.info("Tweet information:")
+                    logger.info(title_formatted)
+                    logger.info("identifier: " + identifier)
+                    logger.info("link: " + link)
+                    logger.info("type_hashtag: " + type_hashtag)
+                    logger.info("conf_hashtags: " + conf_hashtags)
+                    logger.info("phys_hashtags: " + phys_hashtags)
+            if mastodon_client:
+                toot_count += 1
+                if not dry_run:
+                    logger.info("Waiting 10 seconds before tooting")
+                    time.sleep(10)
+                    max_retry = 10
+                    # Retry a couple of times since image processing on server might take some time
+                    for _ in range(max_retry):
+                        toot_response = toot(
+                            mastodon_client,
+                            type_hashtag,
+                            title_formatted,
+                            identifier,
+                            link,
+                            conf_hashtags,
+                            phys_hashtags,
+                            mastodon_image_ids,
+                            post_gif,
+                            config["AUTH"]["MASTODON_BOT_HANDLE"],
+                        )
+                        if not toot_response:
+                            logger.info(
+                                "Waiting another 10 seconds before next toot attempt"
+                            )
+                            time.sleep(10)
+                        if toot_response:
+                            store_id(identifier, post["feed_id"], prefix="MASTODON_")
+                            break
         else:
             logger.info("No media found! Skipping entry.")
 
         if not keep_image_dir:
             # clean up images
             shutil.rmtree(outdir)
-        if tweet_count >= max_tweets:
+        if tweet_count >= max_tweets or toot_count >= max_tweets:
             return
 
 

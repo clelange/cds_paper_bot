@@ -2,11 +2,11 @@
 
 [![DOI](https://zenodo.org/badge/100429308.svg)](https://doi.org/10.5281/zenodo.1203624)
 
-This is a Twitter bot written in python (version 3) that reads the RSS feeds of the [CERN Document Server (CDS)](https://cds.cern.ch/) and creates tweets of new publications.
+This is a Twitter bot written in python (version 3) that reads the RSS feeds of the [CERN Document Server (CDS)](https://cds.cern.ch/) and creates tweets/toots of new publications.
 
 It currently works pretty well for the ATLAS and CMS feeds listed in [`feeds.ini`](../blob/master/feeds.ini), could probably easily be extended to the LHCb and ALICE ones listed in the file already.
 
-Follow the bots on twitter [@CMSpapers](https://twitter.com/CMSpapers), [@ATLASpapers](https://twitter.com/ATLASpapers)/[@ATLAS_results](https://twitter.com/ATLAS_results), and [@LHCb_results](https://twitter.com/LHCb_results).
+Follow the bots on twitter [@CMSpapers](https://twitter.com/CMSpapers), [@ATLASpapers](https://twitter.com/ATLASpapers)/[@ATLAS_results](https://twitter.com/ATLAS_results), and [@LHCb_results](https://twitter.com/LHCb_results). Or follow on Mastodon: [@cmspapers@botsin.space](https://botsin.space/@CMSpapers).
 
 To get it to work as a bot, an `auth.ini` file containing information in the following format:
 
@@ -20,6 +20,18 @@ ACCESS_TOKEN_SECRET = xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 For more details on authentication, refer to the [Twitter Developer Platform](https://developer.twitter.com/).
+
+For using the tool with a Mastodon bot, `auth.ini` should contain:
+
+```ini
+[CMS]
+MASTODON_BOT_HANDLE = @CMSpapers@botsin.space
+MASTODON_ACCESS_TOKEN = xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+You can obtain the access token by creating a new application on your Mastodon account's
+[application settings](https://botsin.space/settings/applications)
+(here provided for [botsin.space](https://botsin.space/)).
 
 For information on running the bot, do
 
