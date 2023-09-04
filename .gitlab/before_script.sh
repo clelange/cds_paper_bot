@@ -4,14 +4,29 @@ set -e
 # echo off
 set -x
 # Create the config
-cat <<EOF > auth.ini
-[${EXPERIMENT}]
-BOT_HANDLE = @${BOTHANDLE}
-CONSUMER_KEY = ${CONSUMER_KEY}
-CONSUMER_SECRET = ${CONSUMER_SECRET}
-ACCESS_TOKEN = ${ACCESS_TOKEN}
-ACCESS_TOKEN_SECRET = ${ACCESS_TOKEN_SECRET}
-EOF
+rm -f auth.ini
+echo "[${EXPERIMENT}]" > auth.ini
+if [ -n "$BOT_HANDLE" ]; then
+    echo "BOT_HANDLE = @${BOT_HANDLE}" >> auth.ini
+fi
+if [ -n "$CONSUMER_KEY" ]; then
+    echo "CONSUMER_KEY = ${CONSUMER_KEY}" >> auth.ini
+fi
+if [ -n "$CONSUMER_SECRET" ]; then
+    echo "CONSUMER_SECRET = ${CONSUMER_SECRET}" >> auth.ini
+fi
+if [ -n "$ACCESS_TOKEN" ]; then
+    echo "ACCESS_TOKEN = ${ACCESS_TOKEN}" >> auth.ini
+fi
+if [ -n "$ACCESS_TOKEN_SECRET" ]; then
+    echo "ACCESS_TOKEN_SECRET = ${ACCESS_TOKEN_SECRET}" >> auth.ini
+fi
+if [ -n "$MASTODON_BOT_HANDLE" ]; then
+    echo "MASTODON_BOT_HANDLE = ${MASTODON_BOT_HANDLE}" >> auth.ini
+fi
+if [ -n "$MASTODON_ACCESS_TOKEN" ]; then
+    echo "MASTODON_ACCESS_TOKEN = ${MASTODON_ACCESS_TOKEN}" >> auth.ini
+fi
 # Create the SSH directory and give it the right permissions
 mkdir -p ~/.ssh
 chmod 700 ~/.ssh
