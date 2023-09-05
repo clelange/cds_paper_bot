@@ -743,7 +743,7 @@ def toot(
                             status=message, media_ids=image_ids
                         )
                     else:
-                        response = mastodon_client(status=message.status_post)
+                        response = mastodon_client.status_post(status=message)
                 except mastodon.MastodonError as mastodon_exception:
                     print(mastodon_exception)
                     logger.error(response)
