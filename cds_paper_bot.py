@@ -26,8 +26,8 @@ from wand.image import Image, Color
 from wand.exceptions import CorruptImageError  # pylint: disable=no-name-in-module
 
 # Maximum image dimension (both x and y)
-MAX_IMG_DIM_X = 1000  # was 1200, could be 1280
-MAX_IMG_DIM_Y = 720
+MAX_IMG_DIM_X = 1000  # could be 1280
+MAX_IMG_DIM_Y = 920  # alternative 720 for 1 megapixel
 MAX_IMG_SIZE = 5242880
 # TODO: tag actual experiment?
 # TODO: Make certain keywords tags
