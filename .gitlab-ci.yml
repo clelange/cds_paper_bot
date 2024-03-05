@@ -21,13 +21,22 @@ update_repo:
   script:
     - ./.gitlab/update_repo.sh
 
-build_docker:
+build_kaniko_command:
   stage: build
   only:
     - web
-  tags:
-    - docker-image-build
-  script: "echo 'Building docker image..." # unused but this line is required by GitLab CI
   variables:
-    TO: $CI_REGISTRY_IMAGE # $CI_REGISTRY_IMAGE is the registry space for this particular repository
-    # TO can be omitted and the imaged will be push to $CI_REGISTRY_IMAGE:latest
+    # To push to a specific docker tag other than latest(the default), amend the --destination parameter, e.g. --destination $CI_REGISTRY_IMAGE:$CI_BUILD_REF_NAME
+    # See https://docs.gitlab.com/ee/ci/variables/predefined_variables.html#variables-reference for available variables
+    IMAGE_DESTINATION: ${CI_REGISTRY_IMAGE}:latest
+  image:
+    # The kaniko debug image is recommended because it has a shell, and a shell is required for an image to be used with GitLab CI/CD.
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  script:
+    # Prepare Kaniko configuration file
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+    # Build and push the image from the Dockerfile at the root of the project.
+    - /kaniko/executor --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/Dockerfile --destination $IMAGE_DESTINATION
+    # Print the full registry path of the pushed image
+    - echo "Image pushed successfully to ${IMAGE_DESTINATION}"

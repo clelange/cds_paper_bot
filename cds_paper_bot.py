@@ -26,8 +26,8 @@ from wand.image import Image, Color
 from wand.exceptions import CorruptImageError  # pylint: disable=no-name-in-module
 
 # Maximum image dimension (both x and y)
-MAX_IMG_DIM_X = 1000  # was 1200, could be 1280
-MAX_IMG_DIM_Y = 720
+MAX_IMG_DIM_X = 1000  # could be 1280
+MAX_IMG_DIM_Y = 920  # alternative 720 for 1 megapixel
 MAX_IMG_SIZE = 5242880
 # TODO: tag actual experiment?
 # TODO: Make certain keywords tags
@@ -105,13 +105,13 @@ CONFERENCES.append(
     Conference("QM2023", maya.parse("2023-09-01"), maya.parse("2023-09-11"))
 )
 CONFERENCES.append(
-    Conference("LHCP #LHCP2023", maya.parse("2023-05-19"), maya.parse("2023-05-31"))
+    Conference("LHCP #LHCP2024", maya.parse("2024-06-01"), maya.parse("2024-06-10"))
 )
 CONFERENCES.append(
     Conference("ICHEP2024", maya.parse("2024-07-16"), maya.parse("2024-07-26"))
 )
 CONFERENCES.append(
-    Conference("BOOST2023", maya.parse("2023-07-30"), maya.parse("2023-08-09"))
+    Conference("BOOST2024", maya.parse("2023-07-27"), maya.parse("2023-08-07"))
 )
 
 daiquiri.setup(level=logging.INFO)
