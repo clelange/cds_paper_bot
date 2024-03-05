@@ -1,4 +1,5 @@
 """Twitter bot to post latest CMS results."""
+
 from __future__ import print_function
 import os
 import sys
@@ -25,7 +26,8 @@ from wand.image import Image, Color
 from wand.exceptions import CorruptImageError  # pylint: disable=no-name-in-module
 
 # Maximum image dimension (both x and y)
-MAX_IMG_DIM = 1000  # was 1200
+MAX_IMG_DIM_X = 1000  # was 1200, could be 1280
+MAX_IMG_DIM_Y = 720
 MAX_IMG_SIZE = 5242880
 # TODO: tag actual experiment?
 # TODO: Make certain keywords tags
@@ -318,9 +320,7 @@ def process_images(identifier, downloaded_image_list, post_gif, use_wand=True):
     logger.info("Processing %d images." % len(downloaded_image_list))
     logger.debug(
         "process_images(): identifier = {}, downloaded_image_list = {},\
-                  use_wand = {}".format(
-            identifier, downloaded_image_list, use_wand
-        )
+                  use_wand = {}".format(identifier, downloaded_image_list, use_wand)
     )
     image_list = []
     images_for_gif = []
@@ -369,10 +369,9 @@ def process_images(identifier, downloaded_image_list, post_gif, use_wand=True):
         float(sum(dim_list_y)) / max(len(dim_list_y), 1),
     )
     dim_xy = int(
-        max(min(MAX_IMG_DIM, average_dims[0]), min(MAX_IMG_DIM, average_dims[0]))
+        max(min(MAX_IMG_DIM_X, average_dims[0]), min(MAX_IMG_DIM_Y, average_dims[0]))
     )
 
-    # print(max_dim[0], max_dim[1], dim_xy, MAX_IMG_DIM)
     # reset max_dim again
     max_dim = [0, 0]
     # scale individual images
