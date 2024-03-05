@@ -382,9 +382,11 @@ def process_images(identifier, downloaded_image_list, post_gif, use_wand=True):
                 # print(filename, img.size[0], img.size[1])
                 if (img.size[0] > dim_xy) or (img.size[1] > dim_xy):
                     scale_factor = dim_xy / float(max(img.size[0], img.size[1]))
-                    area = scale_factor * img.size[0] * img.size[1]
+                    area = scale_factor * scale_factor * img.size[0] * img.size[1]
                     if area > MAX_IMG_DIM_AREA:
-                        scale_factor *= float(MAX_IMG_DIM_AREA / area) * 0.99
+                        scale_factor *= (
+                            float(MAX_IMG_DIM_AREA / area) * 0.97
+                        )  # factor 0.97 accounts for additional margin below
                     img.resize(
                         int(img.size[0] * scale_factor), int(img.size[1] * scale_factor)
                     )
