@@ -26,8 +26,8 @@ from wand.image import Image, Color
 from wand.exceptions import CorruptImageError  # pylint: disable=no-name-in-module
 
 # Maximum image dimension (both x and y)
-MAX_IMG_DIM_X = 1000  # could be 1280
-MAX_IMG_DIM_Y = 920  # alternative 720 for 1 megapixel
+MAX_IMG_DIM = 1000  # could be 1280
+MAX_IMG_DIM_AREA = 1280 * 720  # 1 megapixel
 MAX_IMG_SIZE = 5242880
 # TODO: tag actual experiment?
 # TODO: Make certain keywords tags
@@ -369,7 +369,7 @@ def process_images(identifier, downloaded_image_list, post_gif, use_wand=True):
         float(sum(dim_list_y)) / max(len(dim_list_y), 1),
     )
     dim_xy = int(
-        max(min(MAX_IMG_DIM_X, average_dims[0]), min(MAX_IMG_DIM_Y, average_dims[0]))
+        max(min(MAX_IMG_DIM, average_dims[0]), min(MAX_IMG_DIM, average_dims[0]))
     )
 
     # reset max_dim again
@@ -382,6 +382,9 @@ def process_images(identifier, downloaded_image_list, post_gif, use_wand=True):
                 # print(filename, img.size[0], img.size[1])
                 if (img.size[0] > dim_xy) or (img.size[1] > dim_xy):
                     scale_factor = dim_xy / float(max(img.size[0], img.size[1]))
+                    area = scale_factor * img.size[0] * img.size[1]
+                    if area > MAX_IMG_DIM_AREA:
+                        scale_factor *= float(area / MAX_IMG_DIM_AREA)
                     img.resize(
                         int(img.size[0] * scale_factor), int(img.size[1] * scale_factor)
                     )
