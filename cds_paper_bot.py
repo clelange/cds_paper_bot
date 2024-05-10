@@ -688,13 +688,13 @@ def tweet(
             try:
                 if image_ids:
                     response = twitter.create_tweet(
-                        status=message,
+                        text=message,
                         media_ids=image_ids[i * 4 : (i + 1) * 4],
                         in_reply_to_status_id=previous_status_id,
                     )
                 else:
                     response = twitter.create_tweet(
-                        status=message,
+                        text=message,
                         in_reply_to_status_id=previous_status_id,
                     )
             except tweepy.TweepyException as tweepy_exception:
