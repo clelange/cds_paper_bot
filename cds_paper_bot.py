@@ -1179,7 +1179,7 @@ def main():
                                 image_list = process_images(
                                     outdir, downloaded_image_list, post_gif=False
                                 )
-                                twitter_image_ids = upload_images(
+                                twitter_image_ids = twitter_upload_images(
                                     twitter_client["v1"], image_list, post_gif=False
                                 )
                                 tweet_response = tweet(
