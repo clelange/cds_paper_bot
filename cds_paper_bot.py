@@ -688,13 +688,13 @@ def tweet(
             try:
                 if image_ids:
                     response = twitter.create_tweet(
-                        status=message,
+                        text=message,
                         media_ids=image_ids[i * 4 : (i + 1) * 4],
                         in_reply_to_status_id=previous_status_id,
                     )
                 else:
                     response = twitter.create_tweet(
-                        status=message,
+                        text=message,
                         in_reply_to_status_id=previous_status_id,
                     )
             except tweepy.TweepyException as tweepy_exception:
@@ -1179,7 +1179,7 @@ def main():
                                 image_list = process_images(
                                     outdir, downloaded_image_list, post_gif=False
                                 )
-                                twitter_image_ids = upload_images(
+                                twitter_image_ids = twitter_upload_images(
                                     twitter_client["v1"], image_list, post_gif=False
                                 )
                                 tweet_response = tweet(
