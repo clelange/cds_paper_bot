@@ -4,6 +4,6 @@ lxml==4.9.3
 Mastodon.py==1.8.1
 maya==0.6.1
 pylatexenc==2.10
-requests==2.31.0
+requests==2.32.0
 tweepy==4.14.0
 Wand==0.6.11
