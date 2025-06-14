@@ -1101,18 +1101,117 @@ def main():
                     downloaded_image_list.append(img_path)
 
         twitter_image_ids = []
-        mastodon_image_ids = []
+        mastodon_image_ids = []  # This will be populated
+
         if downloaded_image_list:
-            image_list = process_images(outdir, downloaded_image_list, post_gif)
+            # Twitter processing and upload
             if twitter_client:
-                twitter_image_ids = twitter_upload_images(
-                    twitter_client["v1"], image_list, post_gif
-                )
+                try:
+                    logger.info(
+                        f"Twitter: Initial media processing & upload (post_gif={post_gif})."
+                    )
+                    # Process images for Twitter based on the global post_gif flag.
+                    # Twitter's own fallback logic is handled later in the tweet() function if this upload succeeds but tweeting fails.
+                    image_list_for_twitter = process_images(
+                        outdir, downloaded_image_list, post_gif
+                    )
+                    twitter_image_ids = twitter_upload_images(
+                        twitter_client["v1"], image_list_for_twitter, post_gif
+                    )
+                except (
+                    tweepy.TweepyException
+                ) as e:  # Assuming twitter_upload_images might be changed to raise this
+                    logger.error(
+                        f"Twitter: Initial media upload failed: {e}. Media IDs will be empty."
+                    )
+                    twitter_image_ids = []
+                except Exception as e_twitter_proc:  # Catch other errors like from process_images for twitter
+                    logger.error(
+                        f"Twitter: Error during initial media processing for Twitter: {e_twitter_proc}"
+                    )
+                    twitter_image_ids = []
+
+            # Mastodon processing and upload with fallback
             if mastodon_client:
-                mastodon_image_ids = mastodon_upload_images(
-                    mastodon_client, image_list, post_gif
+                current_post_gif_for_mastodon = post_gif  # Start with global setting
+                processed_image_list_for_mastodon = []  # To hold images processed for Mastodon
+
+                try:
+                    # Attempt 1 (potentially GIF)
+                    logger.info(
+                        f"Mastodon: Initial media processing (post_gif={current_post_gif_for_mastodon})."
+                    )
+                    processed_image_list_for_mastodon = process_images(
+                        outdir, downloaded_image_list, current_post_gif_for_mastodon
+                    )
+                    logger.info(
+                        f"Mastodon: Attempting initial media upload with {len(processed_image_list_for_mastodon)} item(s)."
+                    )
+                    mastodon_image_ids = mastodon_upload_images(
+                        mastodon_client,
+                        processed_image_list_for_mastodon,
+                        current_post_gif_for_mastodon,
+                    )
+                except mastodon.MastodonError as e:  # Catch any MastodonError first
+                    logger.warning(
+                        f"Mastodon: Media upload attempt 1 failed with MastodonError: {e}"
+                    )
+                    if (
+                        current_post_gif_for_mastodon
+                        and isinstance(e, mastodon.MastodonAPIError)
+                        and hasattr(e, "http_status")
+                        and e.http_status == 422
+                    ):
+                        logger.info(
+                            f"Mastodon: Specific MastodonAPIError (422) for GIF detected. Retrying without GIF."
+                        )
+                        current_post_gif_for_mastodon = False  # Fallback: No GIF
+                        try:
+                            logger.info(
+                                f"Mastodon: Fallback media processing (post_gif={current_post_gif_for_mastodon})."
+                            )
+                            processed_image_list_for_mastodon = process_images(
+                                outdir,
+                                downloaded_image_list,
+                                current_post_gif_for_mastodon,
+                            )  # Re-process
+                            logger.info(
+                                f"Mastodon: Attempting fallback media upload with {len(processed_image_list_for_mastodon)} item(s)."
+                            )
+                            mastodon_image_ids = mastodon_upload_images(
+                                mastodon_client,
+                                processed_image_list_for_mastodon,
+                                current_post_gif_for_mastodon,
+                            )
+                        except (
+                            mastodon.MastodonError
+                        ) as e2:  # Catch errors during fallback upload
+                            logger.error(
+                                f"Mastodon: Media upload fallback attempt failed: {e2}"
+                            )
+                            mastodon_image_ids = []
+                        except (
+                            Exception
+                        ) as e_fallback_proc:  # Catch errors during fallback processing
+                            logger.error(
+                                f"Mastodon: Error during fallback media processing: {e_fallback_proc}"
+                            )
+                            mastodon_image_ids = []
+                    else:
+                        # This was a MastodonError but not the specific 422 GIF error, or GIF was not attempted.
+                        logger.error(
+                            f"Mastodon: Media upload failed (MastodonError was not a 422 GIF error or GIF not attempted): {e}"
+                        )
+                        mastodon_image_ids = []
+                except Exception as e_generic:  # Catch other errors like from process_images in the first attempt
+                    logger.error(
+                        f"Mastodon: Unexpected error during initial media preparation/upload: {e_generic}"
+                    )
+                    mastodon_image_ids = []
+
+                logger.debug(
+                    f"Mastodon image IDs after initial upload section: {mastodon_image_ids}"
                 )
-                logger.debug(mastodon_image_ids)
 
         title = post.title
         link = post.link
