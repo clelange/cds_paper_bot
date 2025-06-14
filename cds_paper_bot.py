@@ -359,10 +359,14 @@ def process_images(identifier, downloaded_image_list, post_gif, use_wand=True):
                         if img.size[i] > max_dim[i]:
                             max_dim[i] = img.size[i]
             except CorruptImageError as corrupt_except:
-                print(corrupt_except)
-                print("Ignoring", image_file)
+                logger.error(
+                    f"CorruptImageError: {corrupt_except} for file {image_file}"
+                )
+                logger.warning(f"Ignoring {image_file} due to CorruptImageError.")
             except Exception as general_exception:  # pylint: disable=broad-except
-                print(general_exception)
+                logger.error(
+                    f"General exception processing image {image_file}: {general_exception}"
+                )
     # rescale images
     average_dims = (
         float(sum(dim_list_x)) / max(len(dim_list_x), 1),
@@ -379,11 +383,13 @@ def process_images(identifier, downloaded_image_list, post_gif, use_wand=True):
         if use_wand:
             filename = image_file
             with Image(filename=filename) as img:
-                # print(filename, img.size[0], img.size[1])
+                # logger.debug(f"Initial dimensions for {filename}: {img.size[0]}x{img.size[1]}")
                 if (img.size[0] > dim_xy) or (img.size[1] > dim_xy):
                     scale_factor = dim_xy / float(max(img.size[0], img.size[1]))
                     area = scale_factor * scale_factor * img.size[0] * img.size[1]
-                    print(dim_xy, scale_factor, area, MAX_IMG_DIM_AREA, img.size)
+                    logger.debug(
+                        f"Scaling {filename}: dim_xy={dim_xy}, scale_factor={scale_factor:.2f}, area={area:.0f}, MAX_IMG_DIM_AREA={MAX_IMG_DIM_AREA}, original_size={img.size}"
+                    )
                     if area > MAX_IMG_DIM_AREA:
                         scale_factor *= (
                             float(MAX_IMG_DIM_AREA / area) * 0.97
@@ -459,9 +465,9 @@ def twitter_auth(auth_dict):
             access_token_secret=auth_dict["ACCESS_TOKEN_SECRET"],
         )
     except tweepy.TweepyException as tweepy_exception:
-        print(tweepy_exception)
-        logger.error(twitter_client_v1)
-        logger.error(twitter_client_v2)
+        logger.error(f"Twitter v1/v2 auth error: {tweepy_exception}")
+        logger.error(f"Twitter client v1 state: {twitter_client_v1}")
+        logger.error(f"Twitter client v2 state: {twitter_client_v2}")
         sys.exit(1)
     return {"v1": twitter_client_v1, "v2": twitter_client_v2}
 
@@ -482,8 +488,8 @@ def mastodon_auth(auth_dict):
             api_base_url=api_base_url,
         )
     except Exception as mastodon_exception:  # pylint: disable=broad-except
-        print(mastodon_exception)
-        logger.error(mastodon_client)
+        logger.error(f"Mastodon auth error: {mastodon_exception}")
+        logger.error(f"Mastodon client state: {mastodon_client}")
         sys.exit(1)
     return mastodon_client
 
@@ -525,8 +531,10 @@ def twitter_upload_images(twitter, image_list, post_gif):
                     # media_category="tweet_gif")
                     response = twitter.media_upload(filename=image_path)
                 except tweepy.TweepyException as tweepy_exception:
-                    print(tweepy_exception)
-                    logger.error(response)
+                    logger.error(
+                        f"Twitter GIF upload error for {image_path}: {tweepy_exception}"
+                    )
+                    logger.error(f"Response state: {response}")
                     sys.exit(1)
                 logger.info(response)
                 image_ids.append(response.media_id)
@@ -534,8 +542,10 @@ def twitter_upload_images(twitter, image_list, post_gif):
             try:
                 response = twitter.media_upload(filename=image_path)
             except tweepy.TweepyException as tweepy_exception:
-                print(tweepy_exception)
-                logger.error(response)
+                logger.error(
+                    f"Twitter image upload error for {image_path}: {tweepy_exception}"
+                )
+                logger.error(f"Response state: {response}")
                 sys.exit(1)
             logger.info(response)
             image_ids.append(response.media_id)
@@ -557,7 +567,6 @@ def mastodon_upload_images(mastodon_client, image_list, post_gif):
                         description=f"Animated GIF image for {image_path.split('/')[0]}",
                     )
                 except mastodon.MastodonError as mastodon_exception:
-                    print(mastodon_exception)
                     logger.error(
                         f"Mastodon: Failed to upload media {image_path}. Error: {mastodon_exception}"
                     )
@@ -571,7 +580,6 @@ def mastodon_upload_images(mastodon_client, image_list, post_gif):
                     description=f"Image for {image_path.split('/')[0]}",
                 )
             except mastodon.MastodonError as mastodon_exception:
-                print(mastodon_exception)
                 logger.error(
                     f"Mastodon: Failed to upload media {image_path}. Error: {mastodon_exception}"
                 )
@@ -673,8 +681,10 @@ def tweet(
                     else:
                         response = twitter.create_tweet(text=message)
                 except tweepy.TweepyException as tweepy_exception:
-                    print(tweepy_exception)
-                    logger.error(response)
+                    logger.error(
+                        f"TweepyException during first message (GIF) tweet: {tweepy_exception}"
+                    )
+                    logger.error(f"Response state: {response}")
                     sys.exit(1)
                 first_message = False
                 logger.debug(response)
@@ -684,8 +694,10 @@ def tweet(
                         text=message, in_reply_to_tweet_id=previous_status_id
                     )
                 except tweepy.TweepyException as tweepy_exception:
-                    print(tweepy_exception)
-                    logger.error(response)
+                    logger.error(
+                        f"TweepyException during subsequent message (GIF) tweet: {tweepy_exception}"
+                    )
+                    logger.error(f"Response state: {response}")
                     return None
                 logger.debug(response)
         else:
@@ -702,8 +714,8 @@ def tweet(
                         in_reply_to_status_id=previous_status_id,
                     )
             except tweepy.TweepyException as tweepy_exception:
-                print(tweepy_exception)
-                logger.error(response)
+                logger.error(f"TweepyException during image tweet: {tweepy_exception}")
+                logger.error(f"Response state: {response}")
                 return None
             logger.debug(response)
     return response
@@ -753,8 +765,10 @@ def toot(
                     else:
                         response = mastodon_client.status_post(status=message)
                 except mastodon.MastodonError as mastodon_exception:
-                    print(mastodon_exception)
-                    logger.error(response)
+                    logger.error(
+                        f"MastodonError during first message (GIF) toot: {mastodon_exception}"
+                    )
+                    logger.error(f"Response state: {response}")
                     return None
                 first_message = False
                 logger.debug(response)
@@ -764,8 +778,10 @@ def toot(
                         status=message, in_reply_to_id=previous_status_id
                     )
                 except mastodon.MastodonError as mastodon_exception:
-                    print(mastodon_exception)
-                    logger.error(response)
+                    logger.error(
+                        f"MastodonError during subsequent message (GIF) toot: {mastodon_exception}"
+                    )
+                    logger.error(f"Response state: {response}")
                     return None
                 logger.debug(response)
         else:
@@ -782,8 +798,8 @@ def toot(
                         in_reply_to_id=previous_status_id,
                     )
             except mastodon.MastodonError as mastodon_exception:
-                print(mastodon_exception)
-                logger.error(response)
+                logger.error(f"MastodonError during image toot: {mastodon_exception}")
+                logger.error(f"Response state: {response}")
                 return None
             logger.debug(response)
     return response
