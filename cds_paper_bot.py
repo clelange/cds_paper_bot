@@ -549,7 +549,7 @@ def mastodon_upload_images(mastodon_client, image_list, post_gif):
     image_ids = []
     # loop over sorted images to get the plots in the right order
     for image_path in sorted(image_list):
-        response = None
+        # response = None # response variable is not useful if media_post fails
         if post_gif:
             if image_path.endswith("gif"):
                 try:
@@ -559,8 +559,8 @@ def mastodon_upload_images(mastodon_client, image_list, post_gif):
                     )
                 except mastodon.MastodonError as mastodon_exception:
                     print(mastodon_exception)
-                    logger.error(response)
-                    sys.exit(1)
+                    logger.error(f"Mastodon: Failed to upload media {image_path}. Error: {mastodon_exception}")
+                    raise mastodon_exception
                 logger.info(response)
                 image_ids.append(response.id)
         else:
@@ -571,8 +571,8 @@ def mastodon_upload_images(mastodon_client, image_list, post_gif):
                 )
             except mastodon.MastodonError as mastodon_exception:
                 print(mastodon_exception)
-                logger.error(response)
-                sys.exit(1)
+                logger.error(f"Mastodon: Failed to upload media {image_path}. Error: {mastodon_exception}")
+                raise mastodon_exception
             logger.info(response)
             image_ids.append(response.id)
     logger.info(image_ids)
@@ -1223,11 +1223,47 @@ def main():
             if mastodon_client:
                 toot_count += 1
                 if not dry_run:
-                    logger.info("Waiting 10 seconds before tooting")
+                    logger.info("Waiting 10 seconds before first toot attempt for this item.")
                     time.sleep(10)
-                    max_retry = 10
-                    # Retry a couple of times since image processing on server might take some time
-                    for _ in range(max_retry):
+
+                    mastodon_image_ids = []
+                    actual_post_gif_for_mastodon = post_gif # Variable to track if GIF is used for this toot
+
+                    if downloaded_image_list:
+                        try:
+                            # Attempt 1: Process and upload (possibly as GIF)
+                            logger.info(f"Mastodon: Initial media processing (post_gif={actual_post_gif_for_mastodon}).")
+                            image_list_for_mastodon = process_images(outdir, downloaded_image_list, actual_post_gif_for_mastodon)
+                            mastodon_image_ids = mastodon_upload_images(
+                                mastodon_client, image_list_for_mastodon, actual_post_gif_for_mastodon
+                            )
+                        except mastodon.MastodonAPIError as e:
+                            logger.warning(f"Mastodon: Media upload attempt 1 failed: {e}")
+                            if actual_post_gif_for_mastodon and hasattr(e, 'http_status') and e.http_status == 422:
+                                logger.info("Mastodon: GIF upload failed with 422. Retrying media upload without GIF.")
+                                actual_post_gif_for_mastodon = False # Fallback: No GIF
+                                try:
+                                    # Attempt 2: Process and upload as individual images
+                                    logger.info(f"Mastodon: Fallback media processing (post_gif={actual_post_gif_for_mastodon}).")
+                                    image_list_for_mastodon_fallback = process_images(outdir, downloaded_image_list, post_gif=False)
+                                    mastodon_image_ids = mastodon_upload_images(
+                                        mastodon_client, image_list_for_mastodon_fallback, post_gif=False
+                                    )
+                                except mastodon.MastodonError as e2:
+                                    logger.error(f"Mastodon: Media upload fallback attempt failed: {e2}")
+                                    mastodon_image_ids = [] # Failed to upload any media in fallback
+                            else:
+                                # Not a GIF-related 422 error, or GIF was not attempted initially, or other MastodonAPIError
+                                logger.error(f"Mastodon: Media upload failed with non-422 API error or non-GIF attempt: {e}")
+                                mastodon_image_ids = [] # Failed to upload any media
+                        except Exception as e_generic: # Catch other potential errors (e.g., from process_images)
+                            logger.error(f"Mastodon: Unexpected error during media preparation: {e_generic}")
+                            mastodon_image_ids = [] # Failed to prepare/upload any media
+                    
+                    # Proceed with tooting attempts
+                    toot_response = None
+                    max_retry = 10 
+                    for attempt_num in range(max_retry):
                         toot_response = toot(
                             mastodon_client,
                             type_hashtag,
@@ -1236,20 +1272,42 @@ def main():
                             link,
                             conf_hashtags,
                             phys_hashtags,
-                            mastodon_image_ids,
-                            post_gif,
+                            mastodon_image_ids, # Use the (possibly empty or fallback) list of IDs
+                            actual_post_gif_for_mastodon, # Use the final decision on GIF status
                             config["AUTH"]["MASTODON_BOT_HANDLE"],
                         )
-                        if not toot_response:
-                            logger.info(
-                                "Waiting another 10 seconds before next toot attempt"
-                            )
-                            time.sleep(10)
                         if toot_response:
                             store_id(identifier, post["feed_id"], prefix="MASTODON_")
-                            break
-        else:
-            logger.info("No media found! Skipping entry.")
+                            break 
+                        # If toot failed, and it's not the last attempt, log and wait
+                        if not toot_response and attempt_num < max_retry - 1:
+                            logger.info(
+                                f"Mastodon: Toot attempt {attempt_num + 1}/{max_retry} failed. Waiting 10 seconds before next attempt."
+                            )
+                            time.sleep(10)
+                    
+                    # Final fallback: If all toot attempts failed and images were originally present (implying media was intended)
+                    if not toot_response and downloaded_image_list:
+                        logger.info("Mastodon: All toot attempts (possibly with media) failed. Attempting a final toot explicitly without media.")
+                        final_fallback_toot_response = toot(
+                            mastodon_client,
+                            type_hashtag, title_formatted, identifier, link,
+                            conf_hashtags, phys_hashtags,
+                            image_ids=[], # Explicitly no media
+                            post_gif=False, # GIF status irrelevant here
+                            bot_handle=config["AUTH"]["MASTODON_BOT_HANDLE"],
+                        )
+                        if final_fallback_toot_response:
+                            store_id(identifier, post["feed_id"], prefix="MASTODON_")
+
+                else: # This is the dry_run part
+                    logger.info("Mastodon: Dry run, toot information:")
+                    logger.info(title_formatted)
+                    logger.info("identifier: " + identifier)
+                    logger.info("link: " + link)
+                    logger.info("type_hashtag: " + type_hashtag)
+                    logger.info("conf_hashtags: " + conf_hashtags)
+                    logger.info("phys_hashtags: " + phys_hashtags)
 
         if not keep_image_dir:
             # clean up images
