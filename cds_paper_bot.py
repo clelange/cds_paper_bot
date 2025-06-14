@@ -320,7 +320,34 @@ def execute_command(command):
         logger.debug(result)
 
 
-def process_images(identifier, downloaded_image_list, post_gif, use_wand=True):
+def convert_gif_to_mp4(gif_path, output_path=None):
+    """Convert GIF to MP4 video for BlueSky compatibility."""
+    if output_path is None:
+        output_path = gif_path.replace(".gif", ".mp4")
+
+    try:
+        # Use FFmpeg to convert GIF to MP4
+        # -y: overwrite output file if it exists
+        # -f gif: input format is gif
+        # -pix_fmt yuv420p: pixel format compatible with most players
+        # -movflags +faststart: optimize for web streaming
+        command = f'ffmpeg -y -i "{gif_path}" -pix_fmt yuv420p -movflags +faststart "{output_path}"'
+
+        result = execute_command(command)
+        if result and os.path.exists(output_path):
+            logger.info(f"Successfully converted GIF to MP4: {output_path}")
+            return output_path
+        else:
+            logger.error(f"Failed to convert GIF to MP4: {gif_path}")
+            return None
+    except Exception as e:
+        logger.error(f"Error converting GIF to MP4: {e}")
+        return None
+
+
+def process_images(
+    identifier, downloaded_image_list, post_gif, use_wand=True, platform="twitter"
+):
     """Convert/resize all images to png."""
     logger.info("Processing %d images." % len(downloaded_image_list))
     logger.debug(
@@ -447,6 +474,22 @@ def process_images(identifier, downloaded_image_list, post_gif, use_wand=True):
                 # os.remove('{id}/{id}.gif'.format(id=identifier))
             # replace image list by GIF only
         image_list = ["{id}/{id}.gif".format(id=identifier)]
+
+        # For BlueSky platform, convert GIF to MP4
+        if platform == "bluesky":
+            gif_path = "{id}/{id}.gif".format(id=identifier)
+            mp4_path = convert_gif_to_mp4(gif_path)
+            if mp4_path and os.path.exists(mp4_path):
+                image_list = [mp4_path]
+                logger.info(f"Created MP4 for BlueSky: {mp4_path}")
+            else:
+                logger.warning(
+                    "Failed to create MP4 for BlueSky, falling back to static images"
+                )
+                # Return individual PNG files instead
+                image_list = sorted(
+                    [img for img in image_list if not img.endswith(".gif")]
+                )[:4]
     return image_list
 
 
@@ -618,6 +661,94 @@ def mastodon_upload_images(mastodon_client, image_list, post_gif):
             image_ids.append(response.id)
     logger.info(image_ids)
     return image_ids
+
+
+def bluesky_upload_media(bluesky_client, media_list, identifier_for_alt_text):
+    """Upload images and videos to BlueSky and return appropriate embed objects."""
+    if not bluesky_client or BlueskyClient is None or atproto_models is None:
+        return []
+
+    logger.info("Uploading media to BlueSky.")
+
+    # Separate images and videos
+    image_paths = []
+    video_paths = []
+
+    for media_path in sorted(media_list):
+        if media_path.lower().endswith((".mp4", ".mov", ".avi")):
+            video_paths.append(media_path)
+        else:
+            image_paths.append(media_path)
+
+    embeds = []
+
+    # Handle video uploads (BlueSky supports only one video per post)
+    if video_paths:
+        video_path = video_paths[0]  # Take the first video only
+        try:
+            with open(video_path, "rb") as f:
+                video_data = f.read()
+
+            alt_text_description = (
+                f"Video for {identifier_for_alt_text}: {os.path.basename(video_path)}"
+            )
+            max_alt_text_len = 500
+            if len(alt_text_description) > max_alt_text_len:
+                alt_text_description = (
+                    alt_text_description[: max_alt_text_len - 3] + "..."
+                )
+
+            response = bluesky_client.com.atproto.repo.upload_blob(video_data)
+
+            # Create video embed
+            video_embed = atproto_models.AppBskyEmbedVideo.Main(
+                video=atproto_models.AppBskyEmbedVideo.Video(
+                    blob=response.blob, alt=alt_text_description
+                )
+            )
+            embeds.append(video_embed)
+            logger.info(
+                f"BlueSky: Uploaded video {video_path}, blob CID: {response.blob.cid}"
+            )
+
+        except Exception as e:
+            logger.error(f"BlueSky: Failed to upload video {video_path}. Error: {e}")
+
+    # Handle image uploads (up to 4 images if no video)
+    elif image_paths:
+        image_blobs = []
+        for image_path in sorted(image_paths)[:4]:
+            try:
+                with open(image_path, "rb") as f:
+                    img_data = f.read()
+
+                alt_text_description = f"Image for {identifier_for_alt_text}: {os.path.basename(image_path)}"
+                max_alt_text_len = 500
+                if len(alt_text_description) > max_alt_text_len:
+                    alt_text_description = (
+                        alt_text_description[: max_alt_text_len - 3] + "..."
+                    )
+
+                response = bluesky_client.com.atproto.repo.upload_blob(img_data)
+                image_blobs.append(
+                    atproto_models.AppBskyEmbedImages.Image(
+                        image=response.blob, alt=alt_text_description
+                    )
+                )
+                logger.info(
+                    f"BlueSky: Uploaded {image_path}, blob CID: {response.blob.cid}"
+                )
+            except Exception as e:
+                logger.error(
+                    f"BlueSky: Failed to upload media {image_path}. Error: {e}"
+                )
+
+        if image_blobs:
+            images_embed = atproto_models.AppBskyEmbedImages.Main(images=image_blobs)
+            embeds.append(images_embed)
+
+    logger.info(f"BlueSky uploaded media: {len(embeds)} embed(s)")
+    return embeds
 
 
 def bluesky_upload_images(bluesky_client, image_list, identifier_for_alt_text):
@@ -1092,6 +1223,82 @@ def skeet(
     return response_summary  # Return the URI and CID of the last (or only) skeet
 
 
+def skeet_with_media(
+    bluesky_client,
+    type_hashtag,
+    title,
+    identifier,
+    link,
+    conf_hashtags,
+    phys_hashtags,
+    media_embeds,  # List of embed objects from bluesky_upload_media
+    bot_handle,
+):
+    """Post (skeet) the new results to BlueSky with video/image support."""
+    if not bluesky_client:
+        return None
+
+    logger.info("Creating skeet with media...")
+    skeet_allowed_length = 300
+
+    message_list = split_text(
+        type_hashtag,
+        title,
+        identifier,
+        link,
+        conf_hashtags,
+        phys_hashtags,
+        skeet_allowed_length,
+        bot_handle,
+    )
+
+    previous_skeet_ref = None
+    root_skeet_ref = None
+    response_summary = {}
+
+    for i, message_text in enumerate(message_list):
+        logger.info(f"Skeet part {i + 1}: {message_text}")
+        logger.debug(f"Length: {len(message_text)}")
+
+        # Only add media to the first skeet
+        embed_to_post = None
+        if i == 0 and media_embeds:
+            embed_to_post = media_embeds[0]  # Use the first (and typically only) embed
+
+        reply_ref = None
+        if previous_skeet_ref:
+            reply_ref = atproto_models.AppBskyFeedPost.ReplyRef(
+                parent=previous_skeet_ref, root=root_skeet_ref
+            )
+
+        try:
+            post_record = atproto_models.AppBskyFeedPost.Record(
+                text=message_text,
+                created_at=bluesky_client.get_current_time_iso(),
+                embed=embed_to_post,
+                reply=reply_ref,
+            )
+
+            response = bluesky_client.com.atproto.repo.create_record(
+                repo=bluesky_client.me.did,
+                collection=atproto_models.ids.AppBskyFeedPost,
+                record=post_record.model_dump(exclude_none=True),
+            )
+            logger.debug(f"BlueSky response: {response}")
+
+            current_skeet_strong_ref = atproto_models.create_strong_ref(response)
+            if i == 0:
+                root_skeet_ref = current_skeet_strong_ref
+                response_summary = {"uri": response.uri, "cid": response.cid}
+            previous_skeet_ref = current_skeet_strong_ref
+
+        except Exception as e:
+            logger.error(f"Error during skeet part {i + 1}: {e}")
+            return None
+
+    return response_summary
+
+
 def check_id_exists(identifier, feed_id, prefix=""):
     """Check with ID of the analysis already exists in text file to avoid tweeting again."""
     txt_file_name = f"{prefix}{feed_id}.txt"
@@ -1562,7 +1769,7 @@ def main():
                         post_gif=current_post_gif_for_bluesky,
                     )
                     if image_list_for_bluesky_attempt1:
-                        bluesky_image_blobs = bluesky_upload_images(
+                        bluesky_embeds = bluesky_upload_media(
                             bluesky_client, image_list_for_bluesky_attempt1, identifier
                         )
                     else:
@@ -1847,15 +2054,6 @@ def main():
                         )
                         if final_fallback_toot_response:
                             store_id(identifier, post["feed_id"], prefix="MASTODON_")
-
-                else:  # This is the dry_run part
-                    logger.info("Mastodon: Dry run, toot information:")
-                    logger.info(title_formatted)
-                    logger.info("identifier: " + identifier)
-                    logger.info("link: " + link)
-                    logger.info("type_hashtag: " + type_hashtag)
-                    logger.info("conf_hashtags: " + conf_hashtags)
-                    logger.info("phys_hashtags: " + phys_hashtags)
 
             if bluesky_client and do_skeet:
                 skeet_count += 1
