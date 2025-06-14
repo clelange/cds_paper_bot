@@ -359,10 +359,14 @@ def process_images(identifier, downloaded_image_list, post_gif, use_wand=True):
                         if img.size[i] > max_dim[i]:
                             max_dim[i] = img.size[i]
             except CorruptImageError as corrupt_except:
-                print(corrupt_except)
-                print("Ignoring", image_file)
+                logger.error(
+                    f"CorruptImageError: {corrupt_except} for file {image_file}"
+                )
+                logger.warning(f"Ignoring {image_file} due to CorruptImageError.")
             except Exception as general_exception:  # pylint: disable=broad-except
-                print(general_exception)
+                logger.error(
+                    f"General exception processing image {image_file}: {general_exception}"
+                )
     # rescale images
     average_dims = (
         float(sum(dim_list_x)) / max(len(dim_list_x), 1),
@@ -379,11 +383,13 @@ def process_images(identifier, downloaded_image_list, post_gif, use_wand=True):
         if use_wand:
             filename = image_file
             with Image(filename=filename) as img:
-                # print(filename, img.size[0], img.size[1])
+                # logger.debug(f"Initial dimensions for {filename}: {img.size[0]}x{img.size[1]}")
                 if (img.size[0] > dim_xy) or (img.size[1] > dim_xy):
                     scale_factor = dim_xy / float(max(img.size[0], img.size[1]))
                     area = scale_factor * scale_factor * img.size[0] * img.size[1]
-                    print(dim_xy, scale_factor, area, MAX_IMG_DIM_AREA, img.size)
+                    logger.debug(
+                        f"Scaling {filename}: dim_xy={dim_xy}, scale_factor={scale_factor:.2f}, area={area:.0f}, MAX_IMG_DIM_AREA={MAX_IMG_DIM_AREA}, original_size={img.size}"
+                    )
                     if area > MAX_IMG_DIM_AREA:
                         scale_factor *= (
                             float(MAX_IMG_DIM_AREA / area) * 0.97
@@ -459,9 +465,9 @@ def twitter_auth(auth_dict):
             access_token_secret=auth_dict["ACCESS_TOKEN_SECRET"],
         )
     except tweepy.TweepyException as tweepy_exception:
-        print(tweepy_exception)
-        logger.error(twitter_client_v1)
-        logger.error(twitter_client_v2)
+        logger.error(f"Twitter v1/v2 auth error: {tweepy_exception}")
+        logger.error(f"Twitter client v1 state: {twitter_client_v1}")
+        logger.error(f"Twitter client v2 state: {twitter_client_v2}")
         sys.exit(1)
     return {"v1": twitter_client_v1, "v2": twitter_client_v2}
 
@@ -482,8 +488,8 @@ def mastodon_auth(auth_dict):
             api_base_url=api_base_url,
         )
     except Exception as mastodon_exception:  # pylint: disable=broad-except
-        print(mastodon_exception)
-        logger.error(mastodon_client)
+        logger.error(f"Mastodon auth error: {mastodon_exception}")
+        logger.error(f"Mastodon client state: {mastodon_client}")
         sys.exit(1)
     return mastodon_client
 
@@ -525,8 +531,10 @@ def twitter_upload_images(twitter, image_list, post_gif):
                     # media_category="tweet_gif")
                     response = twitter.media_upload(filename=image_path)
                 except tweepy.TweepyException as tweepy_exception:
-                    print(tweepy_exception)
-                    logger.error(response)
+                    logger.error(
+                        f"Twitter GIF upload error for {image_path}: {tweepy_exception}"
+                    )
+                    logger.error(f"Response state: {response}")
                     sys.exit(1)
                 logger.info(response)
                 image_ids.append(response.media_id)
@@ -534,8 +542,10 @@ def twitter_upload_images(twitter, image_list, post_gif):
             try:
                 response = twitter.media_upload(filename=image_path)
             except tweepy.TweepyException as tweepy_exception:
-                print(tweepy_exception)
-                logger.error(response)
+                logger.error(
+                    f"Twitter image upload error for {image_path}: {tweepy_exception}"
+                )
+                logger.error(f"Response state: {response}")
                 sys.exit(1)
             logger.info(response)
             image_ids.append(response.media_id)
@@ -549,7 +559,6 @@ def mastodon_upload_images(mastodon_client, image_list, post_gif):
     image_ids = []
     # loop over sorted images to get the plots in the right order
     for image_path in sorted(image_list):
-        # response = None # response variable is not useful if media_post fails
         if post_gif:
             if image_path.endswith("gif"):
                 try:
@@ -558,8 +567,9 @@ def mastodon_upload_images(mastodon_client, image_list, post_gif):
                         description=f"Animated GIF image for {image_path.split('/')[0]}",
                     )
                 except mastodon.MastodonError as mastodon_exception:
-                    print(mastodon_exception)
-                    logger.error(f"Mastodon: Failed to upload media {image_path}. Error: {mastodon_exception}")
+                    logger.error(
+                        f"Mastodon: Failed to upload media {image_path}. Error: {mastodon_exception}"
+                    )
                     raise mastodon_exception
                 logger.info(response)
                 image_ids.append(response.id)
@@ -570,8 +580,9 @@ def mastodon_upload_images(mastodon_client, image_list, post_gif):
                     description=f"Image for {image_path.split('/')[0]}",
                 )
             except mastodon.MastodonError as mastodon_exception:
-                print(mastodon_exception)
-                logger.error(f"Mastodon: Failed to upload media {image_path}. Error: {mastodon_exception}")
+                logger.error(
+                    f"Mastodon: Failed to upload media {image_path}. Error: {mastodon_exception}"
+                )
                 raise mastodon_exception
             logger.info(response)
             image_ids.append(response.id)
@@ -670,8 +681,10 @@ def tweet(
                     else:
                         response = twitter.create_tweet(text=message)
                 except tweepy.TweepyException as tweepy_exception:
-                    print(tweepy_exception)
-                    logger.error(response)
+                    logger.error(
+                        f"TweepyException during first message (GIF) tweet: {tweepy_exception}"
+                    )
+                    logger.error(f"Response state: {response}")
                     sys.exit(1)
                 first_message = False
                 logger.debug(response)
@@ -681,8 +694,10 @@ def tweet(
                         text=message, in_reply_to_tweet_id=previous_status_id
                     )
                 except tweepy.TweepyException as tweepy_exception:
-                    print(tweepy_exception)
-                    logger.error(response)
+                    logger.error(
+                        f"TweepyException during subsequent message (GIF) tweet: {tweepy_exception}"
+                    )
+                    logger.error(f"Response state: {response}")
                     return None
                 logger.debug(response)
         else:
@@ -699,8 +714,8 @@ def tweet(
                         in_reply_to_status_id=previous_status_id,
                     )
             except tweepy.TweepyException as tweepy_exception:
-                print(tweepy_exception)
-                logger.error(response)
+                logger.error(f"TweepyException during image tweet: {tweepy_exception}")
+                logger.error(f"Response state: {response}")
                 return None
             logger.debug(response)
     return response
@@ -750,8 +765,10 @@ def toot(
                     else:
                         response = mastodon_client.status_post(status=message)
                 except mastodon.MastodonError as mastodon_exception:
-                    print(mastodon_exception)
-                    logger.error(response)
+                    logger.error(
+                        f"MastodonError during first message (GIF) toot: {mastodon_exception}"
+                    )
+                    logger.error(f"Response state: {response}")
                     return None
                 first_message = False
                 logger.debug(response)
@@ -761,8 +778,10 @@ def toot(
                         status=message, in_reply_to_id=previous_status_id
                     )
                 except mastodon.MastodonError as mastodon_exception:
-                    print(mastodon_exception)
-                    logger.error(response)
+                    logger.error(
+                        f"MastodonError during subsequent message (GIF) toot: {mastodon_exception}"
+                    )
+                    logger.error(f"Response state: {response}")
                     return None
                 logger.debug(response)
         else:
@@ -779,8 +798,8 @@ def toot(
                         in_reply_to_id=previous_status_id,
                     )
             except mastodon.MastodonError as mastodon_exception:
-                print(mastodon_exception)
-                logger.error(response)
+                logger.error(f"MastodonError during image toot: {mastodon_exception}")
+                logger.error(f"Response state: {response}")
                 return None
             logger.debug(response)
     return response
@@ -1098,18 +1117,117 @@ def main():
                     downloaded_image_list.append(img_path)
 
         twitter_image_ids = []
-        mastodon_image_ids = []
+        mastodon_image_ids = []  # This will be populated
+
         if downloaded_image_list:
-            image_list = process_images(outdir, downloaded_image_list, post_gif)
+            # Twitter processing and upload
             if twitter_client:
-                twitter_image_ids = twitter_upload_images(
-                    twitter_client["v1"], image_list, post_gif
-                )
+                try:
+                    logger.info(
+                        f"Twitter: Initial media processing & upload (post_gif={post_gif})."
+                    )
+                    # Process images for Twitter based on the global post_gif flag.
+                    # Twitter's own fallback logic is handled later in the tweet() function if this upload succeeds but tweeting fails.
+                    image_list_for_twitter = process_images(
+                        outdir, downloaded_image_list, post_gif
+                    )
+                    twitter_image_ids = twitter_upload_images(
+                        twitter_client["v1"], image_list_for_twitter, post_gif
+                    )
+                except (
+                    tweepy.TweepyException
+                ) as e:  # Assuming twitter_upload_images might be changed to raise this
+                    logger.error(
+                        f"Twitter: Initial media upload failed: {e}. Media IDs will be empty."
+                    )
+                    twitter_image_ids = []
+                except Exception as e_twitter_proc:  # Catch other errors like from process_images for twitter
+                    logger.error(
+                        f"Twitter: Error during initial media processing for Twitter: {e_twitter_proc}"
+                    )
+                    twitter_image_ids = []
+
+            # Mastodon processing and upload with fallback
             if mastodon_client:
-                mastodon_image_ids = mastodon_upload_images(
-                    mastodon_client, image_list, post_gif
+                current_post_gif_for_mastodon = post_gif  # Start with global setting
+                processed_image_list_for_mastodon = []  # To hold images processed for Mastodon
+
+                try:
+                    # Attempt 1 (potentially GIF)
+                    logger.info(
+                        f"Mastodon: Initial media processing (post_gif={current_post_gif_for_mastodon})."
+                    )
+                    processed_image_list_for_mastodon = process_images(
+                        outdir, downloaded_image_list, current_post_gif_for_mastodon
+                    )
+                    logger.info(
+                        f"Mastodon: Attempting initial media upload with {len(processed_image_list_for_mastodon)} item(s)."
+                    )
+                    mastodon_image_ids = mastodon_upload_images(
+                        mastodon_client,
+                        processed_image_list_for_mastodon,
+                        current_post_gif_for_mastodon,
+                    )
+                except mastodon.MastodonError as e:  # Catch any MastodonError first
+                    logger.warning(
+                        f"Mastodon: Media upload attempt 1 failed with MastodonError: {e}"
+                    )
+                    if (
+                        current_post_gif_for_mastodon
+                        and isinstance(e, mastodon.MastodonAPIError)
+                        and hasattr(e, "http_status")
+                        and e.http_status == 422
+                    ):
+                        logger.info(
+                            f"Mastodon: Specific MastodonAPIError (422) for GIF detected. Retrying without GIF."
+                        )
+                        current_post_gif_for_mastodon = False  # Fallback: No GIF
+                        try:
+                            logger.info(
+                                f"Mastodon: Fallback media processing (post_gif={current_post_gif_for_mastodon})."
+                            )
+                            processed_image_list_for_mastodon = process_images(
+                                outdir,
+                                downloaded_image_list,
+                                current_post_gif_for_mastodon,
+                            )  # Re-process
+                            logger.info(
+                                f"Mastodon: Attempting fallback media upload with {len(processed_image_list_for_mastodon)} item(s)."
+                            )
+                            mastodon_image_ids = mastodon_upload_images(
+                                mastodon_client,
+                                processed_image_list_for_mastodon,
+                                current_post_gif_for_mastodon,
+                            )
+                        except (
+                            mastodon.MastodonError
+                        ) as e2:  # Catch errors during fallback upload
+                            logger.error(
+                                f"Mastodon: Media upload fallback attempt failed: {e2}"
+                            )
+                            mastodon_image_ids = []
+                        except (
+                            Exception
+                        ) as e_fallback_proc:  # Catch errors during fallback processing
+                            logger.error(
+                                f"Mastodon: Error during fallback media processing: {e_fallback_proc}"
+                            )
+                            mastodon_image_ids = []
+                    else:
+                        # This was a MastodonError but not the specific 422 GIF error, or GIF was not attempted.
+                        logger.error(
+                            f"Mastodon: Media upload failed (MastodonError was not a 422 GIF error or GIF not attempted): {e}"
+                        )
+                        mastodon_image_ids = []
+                except Exception as e_generic:  # Catch other errors like from process_images in the first attempt
+                    logger.error(
+                        f"Mastodon: Unexpected error during initial media preparation/upload: {e_generic}"
+                    )
+                    mastodon_image_ids = []
+
+                logger.debug(
+                    f"Mastodon image IDs after initial upload section: {mastodon_image_ids}"
                 )
-                logger.debug(mastodon_image_ids)
 
         title = post.title
         link = post.link
@@ -1223,46 +1341,83 @@ def main():
             if mastodon_client:
                 toot_count += 1
                 if not dry_run:
-                    logger.info("Waiting 10 seconds before first toot attempt for this item.")
+                    logger.info(
+                        "Waiting 10 seconds before first toot attempt for this item."
+                    )
                     time.sleep(10)
 
                     mastodon_image_ids = []
-                    actual_post_gif_for_mastodon = post_gif # Variable to track if GIF is used for this toot
+                    actual_post_gif_for_mastodon = (
+                        post_gif  # Variable to track if GIF is used for this toot
+                    )
 
                     if downloaded_image_list:
                         try:
                             # Attempt 1: Process and upload (possibly as GIF)
-                            logger.info(f"Mastodon: Initial media processing (post_gif={actual_post_gif_for_mastodon}).")
-                            image_list_for_mastodon = process_images(outdir, downloaded_image_list, actual_post_gif_for_mastodon)
-                            mastodon_image_ids = mastodon_upload_images(
-                                mastodon_client, image_list_for_mastodon, actual_post_gif_for_mastodon
+                            logger.info(
+                                f"Mastodon: Initial media processing (post_gif={actual_post_gif_for_mastodon})."
                             )
-                        except mastodon.MastodonAPIError as e:
-                            logger.warning(f"Mastodon: Media upload attempt 1 failed: {e}")
-                            if actual_post_gif_for_mastodon and hasattr(e, 'http_status') and e.http_status == 422:
-                                logger.info("Mastodon: GIF upload failed with 422. Retrying media upload without GIF.")
-                                actual_post_gif_for_mastodon = False # Fallback: No GIF
+                            image_list_for_mastodon = process_images(
+                                outdir,
+                                downloaded_image_list,
+                                actual_post_gif_for_mastodon,
+                            )
+                            mastodon_image_ids = mastodon_upload_images(
+                                mastodon_client,
+                                image_list_for_mastodon,
+                                actual_post_gif_for_mastodon,
+                            )
+                        except (
+                            mastodon.MastodonError
+                        ) as e:  # Changed from MastodonAPIError to MastodonError
+                            logger.warning(
+                                f"Mastodon: Media upload attempt 1 failed: {e}"
+                            )
+                            # Check if it's the specific API error we want to handle for GIF fallback
+                            if (
+                                actual_post_gif_for_mastodon
+                                and isinstance(e, mastodon.MastodonAPIError)
+                                and hasattr(e, "http_status")
+                                and e.http_status == 422
+                            ):
+                                logger.info(
+                                    "Mastodon: GIF upload failed with 422 (MastodonAPIError). Retrying media upload without GIF."
+                                )
+                                actual_post_gif_for_mastodon = False  # Fallback: No GIF
                                 try:
                                     # Attempt 2: Process and upload as individual images
-                                    logger.info(f"Mastodon: Fallback media processing (post_gif={actual_post_gif_for_mastodon}).")
-                                    image_list_for_mastodon_fallback = process_images(outdir, downloaded_image_list, post_gif=False)
+                                    logger.info(
+                                        f"Mastodon: Fallback media processing (post_gif={actual_post_gif_for_mastodon})."
+                                    )
+                                    image_list_for_mastodon_fallback = process_images(
+                                        outdir, downloaded_image_list, post_gif=False
+                                    )
                                     mastodon_image_ids = mastodon_upload_images(
-                                        mastodon_client, image_list_for_mastodon_fallback, post_gif=False
+                                        mastodon_client,
+                                        image_list_for_mastodon_fallback,
+                                        post_gif=False,
                                     )
                                 except mastodon.MastodonError as e2:
-                                    logger.error(f"Mastodon: Media upload fallback attempt failed: {e2}")
-                                    mastodon_image_ids = [] # Failed to upload any media in fallback
+                                    logger.error(
+                                        f"Mastodon: Media upload fallback attempt failed: {e2}"
+                                    )
+                                    mastodon_image_ids = []  # Failed to upload any media in fallback
                             else:
-                                # Not a GIF-related 422 error, or GIF was not attempted initially, or other MastodonAPIError
-                                logger.error(f"Mastodon: Media upload failed with non-422 API error or non-GIF attempt: {e}")
-                                mastodon_image_ids = [] # Failed to upload any media
-                        except Exception as e_generic: # Catch other potential errors (e.g., from process_images)
-                            logger.error(f"Mastodon: Unexpected error during media preparation: {e_generic}")
-                            mastodon_image_ids = [] # Failed to prepare/upload any media
-                    
+                                # This is a MastodonError that is not the specific 422 GIF error,
+                                # or it was a MastodonAPIError not fitting the criteria.
+                                logger.error(
+                                    f"Mastodon: Unhandled MastodonError or non-422 API error during media upload: {e}"
+                                )
+                                mastodon_image_ids = []  # Failed to upload any media
+                        except Exception as e_generic:  # Catch other potential errors (e.g., from process_images)
+                            logger.error(
+                                f"Mastodon: Unexpected error during media preparation: {e_generic}"
+                            )
+                            mastodon_image_ids = []  # Failed to prepare/upload any media
+
                     # Proceed with tooting attempts
                     toot_response = None
-                    max_retry = 10 
+                    max_retry = 10
                     for attempt_num in range(max_retry):
                         toot_response = toot(
                             mastodon_client,
@@ -1272,35 +1427,41 @@ def main():
                             link,
                             conf_hashtags,
                             phys_hashtags,
-                            mastodon_image_ids, # Use the (possibly empty or fallback) list of IDs
-                            actual_post_gif_for_mastodon, # Use the final decision on GIF status
+                            mastodon_image_ids,  # Use the (possibly empty or fallback) list of IDs
+                            actual_post_gif_for_mastodon,  # Use the final decision on GIF status
                             config["AUTH"]["MASTODON_BOT_HANDLE"],
                         )
                         if toot_response:
                             store_id(identifier, post["feed_id"], prefix="MASTODON_")
-                            break 
+                            break
                         # If toot failed, and it's not the last attempt, log and wait
                         if not toot_response and attempt_num < max_retry - 1:
                             logger.info(
                                 f"Mastodon: Toot attempt {attempt_num + 1}/{max_retry} failed. Waiting 10 seconds before next attempt."
                             )
                             time.sleep(10)
-                    
+
                     # Final fallback: If all toot attempts failed and images were originally present (implying media was intended)
                     if not toot_response and downloaded_image_list:
-                        logger.info("Mastodon: All toot attempts (possibly with media) failed. Attempting a final toot explicitly without media.")
+                        logger.info(
+                            "Mastodon: All toot attempts (possibly with media) failed. Attempting a final toot explicitly without media."
+                        )
                         final_fallback_toot_response = toot(
                             mastodon_client,
-                            type_hashtag, title_formatted, identifier, link,
-                            conf_hashtags, phys_hashtags,
-                            image_ids=[], # Explicitly no media
-                            post_gif=False, # GIF status irrelevant here
+                            type_hashtag,
+                            title_formatted,
+                            identifier,
+                            link,
+                            conf_hashtags,
+                            phys_hashtags,
+                            image_ids=[],  # Explicitly no media
+                            post_gif=False,  # GIF status irrelevant here
                             bot_handle=config["AUTH"]["MASTODON_BOT_HANDLE"],
                         )
                         if final_fallback_toot_response:
                             store_id(identifier, post["feed_id"], prefix="MASTODON_")
 
-                else: # This is the dry_run part
+                else:  # This is the dry_run part
                     logger.info("Mastodon: Dry run, toot information:")
                     logger.info(title_formatted)
                     logger.info("identifier: " + identifier)
