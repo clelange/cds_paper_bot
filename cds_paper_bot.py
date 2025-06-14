@@ -25,6 +25,11 @@ import time
 from wand.image import Image, Color
 from wand.exceptions import CorruptImageError  # pylint: disable=no-name-in-module
 
+# Assuming atproto is installed
+from atproto import Client as BlueskyClient
+from atproto import models as atproto_models
+from atproto.exceptions import AtProtocolError as BlueskyAtpApiError
+
 # Maximum image dimension (both x and y)
 MAX_IMG_DIM = 1000  # could be 1280
 MAX_IMG_DIM_AREA = 1280 * 720  # 1 megapixel
@@ -494,6 +499,31 @@ def mastodon_auth(auth_dict):
     return mastodon_client
 
 
+def bluesky_auth(auth_dict):
+    """Authenticate to BlueSky."""
+    # Assuming atproto is installed, so direct check for credentials.
+    if "BLUESKY_HANDLE" not in auth_dict or "BLUESKY_APP_PASSWORD" not in auth_dict:
+        logger.info(
+            "BlueSky handle or app password not found in auth config. Skipping BlueSky."
+        )
+        return None
+
+    bluesky_client = None
+    try:
+        bluesky_client = BlueskyClient()
+        bluesky_client.login(
+            auth_dict["BLUESKY_HANDLE"], auth_dict["BLUESKY_APP_PASSWORD"]
+        )
+        logger.info(
+            f"Successfully logged into BlueSky as {auth_dict['BLUESKY_HANDLE']}"
+        )
+    except Exception as bluesky_exception:
+        logger.error(f"BlueSky auth error: {bluesky_exception}")
+        # We don't sys.exit here to allow other platforms to continue
+        return None
+    return bluesky_client
+
+
 def load_config(experiment, feed_file, auth_file):
     """Load configs into dict."""
     config_dict = {}
@@ -588,6 +618,46 @@ def mastodon_upload_images(mastodon_client, image_list, post_gif):
             image_ids.append(response.id)
     logger.info(image_ids)
     return image_ids
+
+
+def bluesky_upload_images(bluesky_client, image_list, identifier_for_alt_text):
+    """Upload images to BlueSky and return blob references."""
+    if not bluesky_client or BlueskyClient is None or atproto_models is None:
+        return []
+    logger.info("Uploading images to BlueSky.")
+    image_blobs = []
+    # BlueSky allows up to 4 images
+    for image_path in sorted(image_list)[:4]:
+        try:
+            with open(image_path, "rb") as f:
+                img_data = f.read()
+
+            alt_text_description = (
+                f"Image for {identifier_for_alt_text}: {os.path.basename(image_path)}"
+            )
+            # Truncate alt text if too long
+            max_alt_text_len = (
+                500  # A reasonable guess, atproto might have stricter internal limits
+            )
+            if len(alt_text_description) > max_alt_text_len:
+                alt_text_description = (
+                    alt_text_description[: max_alt_text_len - 3] + "..."
+                )
+
+            response = bluesky_client.com.atproto.repo.upload_blob(img_data)
+            image_blobs.append(
+                atproto_models.AppBskyEmbedImages.Image(  # pyright: ignore [reportOptionalMemberAccess]
+                    image=response.blob, alt=alt_text_description
+                )
+            )
+            logger.info(
+                f"BlueSky: Uploaded {image_path}, blob CID: {response.blob.cid}"
+            )
+        except Exception as e:
+            logger.error(f"BlueSky: Failed to upload media {image_path}. Error: {e}")
+            # Continue to try uploading other images if one fails
+    logger.info(f"BlueSky uploaded blobs: {len(image_blobs)}")
+    return image_blobs
 
 
 def split_text(
@@ -805,6 +875,94 @@ def toot(
     return response
 
 
+def skeet(
+    bluesky_client,
+    type_hashtag,
+    title,
+    identifier,
+    link,
+    conf_hashtags,
+    phys_hashtags,
+    image_blobs,  # List of blob objects from bluesky_upload_images
+    bot_handle,
+):
+    """Post (skeet) the new results to BlueSky."""
+    if (
+        not bluesky_client
+        or BlueskyClient is None
+        or atproto_models is None
+        or BlueskyAtpApiError is None
+    ):
+        return None
+
+    logger.info("Creating skeet ...")
+    skeet_allowed_length = 300
+
+    message_list = split_text(
+        type_hashtag,
+        title,
+        identifier,
+        link,
+        conf_hashtags,
+        phys_hashtags,
+        skeet_allowed_length,
+        bot_handle,
+    )
+
+    previous_skeet_ref = None
+    root_skeet_ref = None
+    response_summary = {}
+
+    for i, message_text in enumerate(message_list):
+        logger.info(f"Skeet part {i + 1}: {message_text}")
+        logger.debug(f"Length: {len(message_text)}")
+
+        embed_to_post = None
+        if i == 0 and image_blobs:
+            embed_to_post = atproto_models.AppBskyEmbedImages.Main(images=image_blobs)  # pyright: ignore [reportOptionalMemberAccess]
+
+        reply_ref = None
+        if previous_skeet_ref:
+            reply_ref = atproto_models.AppBskyFeedPost.ReplyRef(  # pyright: ignore [reportOptionalMemberAccess]
+                parent=previous_skeet_ref, root=root_skeet_ref
+            )
+
+        try:
+            post_record = atproto_models.AppBskyFeedPost.Main(  # pyright: ignore [reportOptionalMemberAccess]
+                text=message_text,
+                created_at=bluesky_client.get_current_time_iso(),
+                embed=embed_to_post if embed_to_post else None,
+                reply=reply_ref if reply_ref else None,
+            )
+
+            response = bluesky_client.com.atproto.repo.create_record(
+                repo=bluesky_client.me.did,
+                collection=atproto_models.ids.AppBskyFeedPost,  # pyright: ignore [reportOptionalMemberAccess]
+                record=post_record,
+            )
+            logger.debug(f"BlueSky response: {response}")
+
+            current_skeet_strong_ref = atproto_models.ComAtprotoRepoStrongRef.Main(  # pyright: ignore [reportOptionalMemberAccess]
+                uri=response.uri, cid=response.cid
+            )
+            if i == 0:
+                root_skeet_ref = current_skeet_strong_ref
+                response_summary = {"uri": response.uri, "cid": response.cid}
+            previous_skeet_ref = current_skeet_strong_ref
+
+        except BlueskyAtpApiError as e:
+            logger.error(
+                f"BlueSky ATP API Error during skeet part {i + 1}: {e.message if hasattr(e, 'message') else e}"
+            )
+            logger.error(f"Full BlueSky error details: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Generic error during skeet part {i + 1}: {e}")
+            return None
+
+    return response_summary
+
+
 def check_id_exists(identifier, feed_id, prefix=""):
     """Check with ID of the analysis already exists in text file to avoid tweeting again."""
     txt_file_name = f"{prefix}{feed_id}.txt"
@@ -929,15 +1087,28 @@ def main():
         return
     twitter_client = twitter_auth(config["AUTH"])
     mastodon_client = mastodon_auth(config["AUTH"])
+    bluesky_client = None
+    if BlueskyClient is not None:  # Check if atproto was imported
+        bluesky_client = bluesky_auth(config["AUTH"])
+        if bluesky_client is None:
+            logger.info(
+                "BlueSky client initialization failed, BlueSky features will be skipped."
+            )
+    else:
+        logger.info(
+            "BlueSky library (atproto) not installed at top level, skipping BlueSky features."
+        )
 
     # loop over posts sorted by date
     tweet_count = 0
     toot_count = 0
+    skeet_count = 0  # New counter for BlueSky
     for post in sorted(
         feed_entries, key=lambda x: maya.parse(x["published"]).datetime()
     ):
         do_toot = True
         do_tweet = True
+        do_skeet = True
         downloaded_image_list = []
         n_figures = 0
         downloaded_doc_list = []
@@ -973,7 +1144,18 @@ def main():
                     do_toot = False
             else:
                 do_toot = False
-        if not do_toot and not do_tweet:
+
+            if bluesky_client:  # Only check if client is available
+                if check_id_exists(identifier, post["feed_id"], prefix="BLUESKY_"):
+                    logger.debug(
+                        "%s has already been skeeted for feed %s"
+                        % (identifier, post["feed_id"])
+                    )
+                    do_skeet = False
+            else:  # If client is None (not configured or auth failed)
+                do_skeet = False
+
+        if not do_toot and not do_tweet and not do_skeet:  # Updated condition
             continue
         logger.info(
             "{id} - published: {date}".format(
@@ -1117,7 +1299,8 @@ def main():
                     downloaded_image_list.append(img_path)
 
         twitter_image_ids = []
-        mastodon_image_ids = []  # This will be populated
+        mastodon_image_ids = []
+        bluesky_image_blobs = []
 
         if downloaded_image_list:
             # Twitter processing and upload
@@ -1158,7 +1341,9 @@ def main():
                         f"Mastodon: Initial media processing (post_gif={current_post_gif_for_mastodon})."
                     )
                     processed_image_list_for_mastodon = process_images(
-                        outdir, downloaded_image_list, current_post_gif_for_mastodon
+                        outdir,
+                        downloaded_image_list,
+                        current_post_gif_for_mastodon,
                     )
                     logger.info(
                         f"Mastodon: Attempting initial media upload with {len(processed_image_list_for_mastodon)} item(s)."
@@ -1227,6 +1412,79 @@ def main():
 
                 logger.debug(
                     f"Mastodon image IDs after initial upload section: {mastodon_image_ids}"
+                )
+
+            # BlueSky processing and upload
+            bluesky_image_blobs = []  # Initialize to empty list
+            if bluesky_client and do_skeet:  # Check client and if we intend to skeet
+                current_post_gif_for_bluesky = (
+                    post_gif  # Start with global/user preference for GIF
+                )
+
+                # Attempt 1: Process and upload as GIF (if post_gif is True) or static images
+                try:
+                    logger.info(
+                        f"BlueSky: Initial media processing (post_gif={current_post_gif_for_bluesky})."
+                    )
+                    # Use a different variable name to avoid confusion if process_images is called again for fallback
+                    image_list_for_bluesky_attempt1 = process_images(
+                        outdir,
+                        downloaded_image_list,
+                        post_gif=current_post_gif_for_bluesky,
+                    )
+                    if image_list_for_bluesky_attempt1:
+                        bluesky_image_blobs = bluesky_upload_images(
+                            bluesky_client, image_list_for_bluesky_attempt1, identifier
+                        )
+                    else:
+                        logger.info("BlueSky: No images processed in first attempt.")
+                        # bluesky_image_blobs remains empty
+                except Exception as e_bsky_proc1:
+                    logger.error(
+                        f"BlueSky: Error during initial media processing/upload attempt: {e_bsky_proc1}"
+                    )
+                    bluesky_image_blobs = []  # Ensure it's empty on error
+
+                # Attempt 2 (Fallback): If GIF was attempted (current_post_gif_for_bluesky was true)
+                # and it resulted in no blobs, try static images.
+                if not bluesky_image_blobs and current_post_gif_for_bluesky:
+                    logger.info(
+                        "BlueSky: GIF upload attempt failed or resulted in no blobs. Falling back to static images."
+                    )
+                    # Force static images for fallback by setting post_gif for this specific call to False
+                    try:
+                        logger.info(
+                            "BlueSky: Fallback media processing (post_gif=False)."
+                        )
+                        image_list_for_bluesky_fallback = process_images(
+                            outdir,
+                            downloaded_image_list,
+                            post_gif=False,  # Explicitly False for fallback
+                        )
+                        if image_list_for_bluesky_fallback:
+                            bluesky_image_blobs = bluesky_upload_images(
+                                bluesky_client,
+                                image_list_for_bluesky_fallback,
+                                identifier,
+                            )
+                        else:
+                            logger.info(
+                                "BlueSky: No images processed in fallback attempt."
+                            )
+                            # bluesky_image_blobs remains empty
+                    except Exception as e_bsky_proc_fallback:
+                        logger.error(
+                            f"BlueSky: Error during fallback media processing/upload: {e_bsky_proc_fallback}"
+                        )
+                        bluesky_image_blobs = []  # Ensure it's empty on error
+
+                if not bluesky_image_blobs:
+                    logger.info(
+                        "BlueSky: All media processing/upload attempts failed or yielded no images."
+                    )
+
+                logger.debug(
+                    f"BlueSky image blobs after all attempts: {len(bluesky_image_blobs)} blobs."
                 )
 
         title = post.title
@@ -1470,10 +1728,83 @@ def main():
                     logger.info("conf_hashtags: " + conf_hashtags)
                     logger.info("phys_hashtags: " + phys_hashtags)
 
+            if bluesky_client and do_skeet:
+                skeet_count += 1
+                if not dry_run:
+                    logger.info(
+                        "Waiting 5 seconds before first skeet attempt for this item."
+                    )
+                    time.sleep(5)
+
+                    skeet_response = skeet(
+                        bluesky_client,
+                        type_hashtag,
+                        title_formatted,
+                        identifier,
+                        link,
+                        conf_hashtags,
+                        phys_hashtags,
+                        bluesky_image_blobs,
+                        config["AUTH"].get("BLUESKY_HANDLE", ""),
+                    )
+
+                    if not skeet_response and bluesky_image_blobs:
+                        logger.info(
+                            "BlueSky: Skeet with media failed. Attempting skeet without media."
+                        )
+                        time.sleep(5)
+                        skeet_response = skeet(
+                            bluesky_client,
+                            type_hashtag,
+                            title_formatted,
+                            identifier,
+                            link,
+                            conf_hashtags,
+                            phys_hashtags,
+                            [],
+                            config["AUTH"].get("BLUESKY_HANDLE", ""),
+                        )
+
+                    if skeet_response:
+                        store_id(identifier, post["feed_id"], prefix="BLUESKY_")
+                        logger.info(
+                            f"BlueSky: Successfully skeeted. URI: {skeet_response.get('uri')}"
+                        )
+                    else:
+                        logger.error(
+                            "BlueSky: All skeet attempts failed for this item."
+                        )
+
+                else:
+                    logger.info("BlueSky: Dry run, skeet information:")
+                    # Simpler dry run log for BlueSky, focusing on the combined text from split_text
+                    temp_message_list_for_dry_run = split_text(
+                        type_hashtag,
+                        title_formatted,
+                        identifier,
+                        link,
+                        conf_hashtags,
+                        phys_hashtags,
+                        300,  # skeet_allowed_length
+                        config["AUTH"].get("BLUESKY_HANDLE", ""),
+                    )
+                    for i, dry_message in enumerate(temp_message_list_for_dry_run):
+                        logger.info(f"Skeet part {i + 1} (dry run): {dry_message}")
+
+                    logger.info(
+                        f"Number of images prepared for BlueSky (dry run): {len(bluesky_image_blobs)}"
+                    )
+                    logger.info("Identifier (dry run): " + identifier)
+
         if not keep_image_dir:
             # clean up images
             shutil.rmtree(outdir)
-        if tweet_count >= max_tweets or toot_count >= max_tweets:
+        if (
+            tweet_count >= max_tweets
+            or toot_count >= max_tweets
+            or skeet_count >= max_tweets
+        ):  # Updated condition
+            logger.info(f"Reached max posts limit ({max_tweets}). Exiting.")
             return
 
 
