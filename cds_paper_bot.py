@@ -383,6 +383,7 @@ def process_images(identifier, downloaded_image_list, post_gif, use_wand=True):
                 if (img.size[0] > dim_xy) or (img.size[1] > dim_xy):
                     scale_factor = dim_xy / float(max(img.size[0], img.size[1]))
                     area = scale_factor * scale_factor * img.size[0] * img.size[1]
+                    print(dim_xy, scale_factor, area, MAX_IMG_DIM_AREA, img.size)
                     if area > MAX_IMG_DIM_AREA:
                         scale_factor *= (
                             float(MAX_IMG_DIM_AREA / area) * 0.97
@@ -471,9 +472,9 @@ def mastodon_auth(auth_dict):
     if "MASTODON_ACCESS_TOKEN" not in auth_dict:
         return None
     # Extract api_base_url from MASTODON_HANDLE
-    api_base_url = f'https://{auth_dict["MASTODON_BOT_HANDLE"].split("@")[-1]}/'
+    api_base_url = f"https://{auth_dict['MASTODON_BOT_HANDLE'].split('@')[-1]}/"
     logger.info(
-        f'Using api_base_url: {api_base_url} for {auth_dict["MASTODON_BOT_HANDLE"]}'
+        f"Using api_base_url: {api_base_url} for {auth_dict['MASTODON_BOT_HANDLE']}"
     )
     try:
         mastodon_client = mastodon.Mastodon(
@@ -554,7 +555,7 @@ def mastodon_upload_images(mastodon_client, image_list, post_gif):
                 try:
                     response = mastodon_client.media_post(
                         media_file=image_path,
-                        description=f'Animated GIF image for {image_path.split("/")[0]}',
+                        description=f"Animated GIF image for {image_path.split('/')[0]}",
                     )
                 except mastodon.MastodonError as mastodon_exception:
                     print(mastodon_exception)
@@ -566,7 +567,7 @@ def mastodon_upload_images(mastodon_client, image_list, post_gif):
             try:
                 response = mastodon_client.media_post(
                     media_file=image_path,
-                    description=f'Image for {image_path.split("/")[0]}',
+                    description=f"Image for {image_path.split('/')[0]}",
                 )
             except mastodon.MastodonError as mastodon_exception:
                 print(mastodon_exception)
