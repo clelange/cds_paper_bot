@@ -885,6 +885,9 @@ def skeet(
     phys_hashtags,
     image_blobs,  # List of blob objects from bluesky_upload_images
     bot_handle,
+    max_length=300,  # BlueSky has a 300 char limit for posts
+    initial_skeet_ref=None,  # For threading replies, the first post in a thread
+    previous_skeet_ref=None,  # For threading replies, the direct parent of this post
 ):
     """Post (skeet) the new results to BlueSky."""
     if (
@@ -893,10 +896,10 @@ def skeet(
         or atproto_models is None
         or BlueskyAtpApiError is None
     ):
+        logger.error("BlueSky client or models not available. Cannot skeet.")
         return None
 
     logger.info("Creating skeet ...")
-    skeet_allowed_length = 300
 
     message_list = split_text(
         type_hashtag,
@@ -905,62 +908,74 @@ def skeet(
         link,
         conf_hashtags,
         phys_hashtags,
-        skeet_allowed_length,
+        max_length,
         bot_handle,
     )
 
-    previous_skeet_ref = None
-    root_skeet_ref = None
-    response_summary = {}
+    root_skeet_ref = initial_skeet_ref  # This will be the first post in the thread
+    current_skeet_strong_ref = None
 
     for i, message_text in enumerate(message_list):
         logger.info(f"Skeet part {i + 1}: {message_text}")
         logger.debug(f"Length: {len(message_text)}")
 
         embed_to_post = None
-        if i == 0 and image_blobs:
+        if i == 0 and image_blobs:  # Only add images to the first skeet in a thread
             embed_to_post = atproto_models.AppBskyEmbedImages.Main(images=image_blobs)  # pyright: ignore [reportOptionalMemberAccess]
 
         reply_ref = None
-        if previous_skeet_ref:
+        if previous_skeet_ref:  # This means it's a reply
+            if not root_skeet_ref:  # If this is the first reply, its parent is the root
+                root_skeet_ref = previous_skeet_ref
             reply_ref = atproto_models.AppBskyFeedPost.ReplyRef(  # pyright: ignore [reportOptionalMemberAccess]
                 parent=previous_skeet_ref, root=root_skeet_ref
             )
 
         try:
-            post_record = atproto_models.AppBskyFeedPost.Main(  # pyright: ignore [reportOptionalMemberAccess]
+            # Construct the record
+            post_record = atproto_models.AppBskyFeedPost.Record(  # pyright: ignore [reportOptionalMemberAccess]
+                created_at=bluesky_client.get_current_time_iso(),  # pyright: ignore [reportOptionalMemberAccess]
                 text=message_text,
-                created_at=bluesky_client.get_current_time_iso(),
-                embed=embed_to_post if embed_to_post else None,
-                reply=reply_ref if reply_ref else None,
+                embed=embed_to_post
+                if embed_to_post
+                else None,  # Ensure embed is None if no images
+                reply=reply_ref
+                if reply_ref
+                else None,  # Ensure reply is None if not a reply
+                # langs=None, # Optional: specify languages
+                # facets=None, # Optional: for rich text
+                # tags=None # Optional: for tags
             )
 
-            response = bluesky_client.com.atproto.repo.create_record(
-                repo=bluesky_client.me.did,
+            response = bluesky_client.com.atproto.repo.create_record(  # pyright: ignore [reportOptionalMemberAccess]
                 collection=atproto_models.ids.AppBskyFeedPost,  # pyright: ignore [reportOptionalMemberAccess]
+                repo=bluesky_client.me.did,  # pyright: ignore [reportOptionalMemberAccess] # pyright: ignore [reportOptionalMemberAccess]
                 record=post_record,
             )
-            logger.debug(f"BlueSky response: {response}")
+            logger.info(
+                f"Successfully skeeted part {i + 1}. URI: {response.uri}, CID: {response.cid}"
+            )  # pyright: ignore [reportOptionalMemberAccess]
 
-            current_skeet_strong_ref = atproto_models.ComAtprotoRepoStrongRef.Main(  # pyright: ignore [reportOptionalMemberAccess]
-                uri=response.uri, cid=response.cid
-            )
-            if i == 0:
-                root_skeet_ref = current_skeet_strong_ref
-                response_summary = {"uri": response.uri, "cid": response.cid}
+            # For the next iteration, this post becomes the parent
+            # And we need a StrongRef to it for the reply_ref
+            current_skeet_strong_ref = atproto_models.ComAtprotoRepoStrongRef.Main(
+                cid=response.cid, uri=response.uri
+            )  # pyright: ignore [reportOptionalMemberAccess]
             previous_skeet_ref = current_skeet_strong_ref
+            if (
+                i == 0 and not root_skeet_ref
+            ):  # If this was the first post and no initial_skeet_ref was passed
+                root_skeet_ref = current_skeet_strong_ref
 
         except BlueskyAtpApiError as e:
-            logger.error(
-                f"BlueSky ATP API Error during skeet part {i + 1}: {e.message if hasattr(e, 'message') else e}"
-            )
-            logger.error(f"Full BlueSky error details: {e}")
-            return None
-        except Exception as e:
+            logger.error(f"BlueSky API error during skeet part {i + 1}: {e}")
+            return None  # Stop on API error
+        except Exception as e:  # Catch any other unexpected errors
             logger.error(f"Generic error during skeet part {i + 1}: {e}")
-            return None
+            return None  # Stop on generic error
 
-    return response_summary
+    # Return the reference to the last skeet posted, which might be the root if only one part.
+    return root_skeet_ref if len(message_list) == 1 else current_skeet_strong_ref
 
 
 def check_id_exists(identifier, feed_id, prefix=""):
