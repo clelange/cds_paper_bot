@@ -979,7 +979,9 @@ def skeet(
             record_data = atproto_models.ComAtprotoRepoCreateRecord.Data(  # pyright: ignore [reportOptionalMemberAccess]
                 repo=bluesky_client.me.did,  # pyright: ignore [reportOptionalMemberAccess, reportUnknownMemberType]
                 collection=atproto_models.ids.AppBskyFeedPost,  # pyright: ignore [reportOptionalMemberAccess]
-                record=post_record.dict(exclude_none=True),  # Convert record to dict
+                record=post_record.model_dump(
+                    exclude_none=True
+                ),  # Convert record to dict
             )
 
             response = bluesky_client.com.atproto.repo.create_record(data=record_data)  # pyright: ignore [reportOptionalMemberAccess, reportUnknownMemberType]
@@ -1012,7 +1014,7 @@ def skeet(
                         atproto_models.ComAtprotoRepoCreateRecord.Data(  # pyright: ignore [reportOptionalMemberAccess]
                             repo=bluesky_client.me.did,  # pyright: ignore [reportOptionalMemberAccess, reportUnknownMemberType]
                             collection=atproto_models.ids.AppBskyFeedPost,  # pyright: ignore [reportOptionalMemberAccess]
-                            record=post_record_no_media.dict(exclude_none=True),
+                            record=post_record_no_media.model_dump(exclude_none=True),
                         )
                     )
                     response = bluesky_client.com.atproto.repo.create_record(
@@ -1055,7 +1057,9 @@ def skeet(
                         atproto_models.ComAtprotoRepoCreateRecord.Data(  # pyright: ignore [reportOptionalMemberAccess]
                             repo=bluesky_client.me.did,  # pyright: ignore [reportOptionalMemberAccess, reportUnknownMemberType]
                             collection=atproto_models.ids.AppBskyFeedPost,  # pyright: ignore [reportOptionalMemberAccess]
-                            record=post_record_no_media_generic.dict(exclude_none=True),
+                            record=post_record_no_media_generic.model_dump(
+                                exclude_none=True
+                            ),
                         )
                     )
                     response = bluesky_client.com.atproto.repo.create_record(
