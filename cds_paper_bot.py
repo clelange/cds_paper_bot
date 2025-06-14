@@ -1252,17 +1252,21 @@ def main():
                                 image_list_for_mastodon,
                                 actual_post_gif_for_mastodon,
                             )
-                        except mastodon.MastodonAPIError as e:
+                        except (
+                            mastodon.MastodonError
+                        ) as e:  # Changed from MastodonAPIError to MastodonError
                             logger.warning(
                                 f"Mastodon: Media upload attempt 1 failed: {e}"
                             )
+                            # Check if it's the specific API error we want to handle for GIF fallback
                             if (
                                 actual_post_gif_for_mastodon
+                                and isinstance(e, mastodon.MastodonAPIError)
                                 and hasattr(e, "http_status")
                                 and e.http_status == 422
                             ):
                                 logger.info(
-                                    "Mastodon: GIF upload failed with 422. Retrying media upload without GIF."
+                                    "Mastodon: GIF upload failed with 422 (MastodonAPIError). Retrying media upload without GIF."
                                 )
                                 actual_post_gif_for_mastodon = False  # Fallback: No GIF
                                 try:
@@ -1284,9 +1288,10 @@ def main():
                                     )
                                     mastodon_image_ids = []  # Failed to upload any media in fallback
                             else:
-                                # Not a GIF-related 422 error, or GIF was not attempted initially, or other MastodonAPIError
+                                # This is a MastodonError that is not the specific 422 GIF error,
+                                # or it was a MastodonAPIError not fitting the criteria.
                                 logger.error(
-                                    f"Mastodon: Media upload failed with non-422 API error or non-GIF attempt: {e}"
+                                    f"Mastodon: Unhandled MastodonError or non-422 API error during media upload: {e}"
                                 )
                                 mastodon_image_ids = []  # Failed to upload any media
                         except Exception as e_generic:  # Catch other potential errors (e.g., from process_images)
