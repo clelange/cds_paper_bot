@@ -724,19 +724,16 @@ def detect_facets(text):
     url_pattern = r"https?://[^\s]+"
 
     for match in re.finditer(url_pattern, text):
-        start = match.start()
-        end = match.end()
-        url = text[start:end]
+        start = len(text[: match.start()].encode("utf-8"))
+        end = len(text[: match.end()].encode("utf-8"))
+        url = text[match.start() : match.end()]
 
-        # Create URI facet
-        facets.append(
-            atproto_models.AppBskyRichtextFacet.Main(
-                index=atproto_models.AppBskyRichtextFacet.ByteSlice(
-                    byteStart=start, byteEnd=end
-                ),
-                features=[atproto_models.AppBskyRichtextFacet.Link(uri=url)],
-            )
-        )
+        # Create facet dictionary format that BlueSky expects
+        facet = {
+            "index": {"byteStart": start, "byteEnd": end},
+            "features": [{"$type": "app.bsky.richtext.facet#link", "uri": url}],
+        }
+        facets.append(facet)
 
     return facets if facets else None
 
