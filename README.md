@@ -49,7 +49,7 @@ For using the tool with a BlueSky bot, `auth.ini` should contain:
 
 ```ini
 [CMS]
-BLUESKY_HANDLE = @cmspapers.bsky.social
+BLUESKY_HANDLE = cmspapers.bsky.social
 BLUESKY_APP_PASSWORD = xxxx-xxxx-xxxx-xxxx
 ```
 
