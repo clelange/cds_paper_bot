@@ -18,6 +18,7 @@ ENV PACKAGES="\
   ghostscript \
   git \
   openssh-client \
+  ffmpeg \
   "
 
 COPY requirements.txt /tmp/requirements.txt
