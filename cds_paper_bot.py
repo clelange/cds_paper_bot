@@ -980,37 +980,34 @@ def skeet(
         logger.debug(f"Length: {len(message_text)}")
 
         embed_to_post = None
-        if i == 0 and image_blobs:  # Only add images to the first skeet of a thread
-            # Ensure image_blobs is a list of atproto_models.AppBskyEmbedImages.Image
-            valid_image_objects = []
-            if isinstance(image_blobs, list):  # Check if it's a list first
-                for blob_item in image_blobs:
-                    if isinstance(blob_item, atproto_models.AppBskyEmbedImages.Image):  # pyright: ignore [reportOptionalMemberAccess]
-                        valid_image_objects.append(blob_item)
-                    elif hasattr(blob_item, "blob") and hasattr(
-                        blob_item, "alt"
-                    ):  # Handle if it's a simple structure
-                        # This case might occur if bluesky_upload_images returns a simpler list
-                        # For now, we assume it returns the correct Image objects.
-                        # If not, this part would need adjustment or bluesky_upload_images needs to ensure it.
-                        logger.warning(
-                            "Received a blob item that is not an Image object, attempting to adapt if possible or skipping."
-                        )
-                        # Potentially try to construct an Image object if blob_item has 'blob' and 'alt'
-                        # For now, we'll be strict and expect Image objects.
-                    else:
-                        logger.warning(
-                            f"Skipping invalid item in image_blobs: {type(blob_item)}"
-                        )
+        if i == 0 and image_blobs:  # Only add media to the first skeet of a thread
+            if len(image_blobs) == 1 and isinstance(
+                image_blobs[0], atproto_models.AppBskyEmbedVideo.Main
+            ):
+                # Handle video embed
+                embed_to_post = image_blobs[0]
+                logger.info("Using video embed for skeet")
+            else:
+                # Handle image embeds
+                valid_image_objects = []
+                if isinstance(image_blobs, list):
+                    for blob_item in image_blobs:
+                        if isinstance(
+                            blob_item, atproto_models.AppBskyEmbedImages.Image
+                        ):
+                            valid_image_objects.append(blob_item)
+                        else:
+                            logger.warning(
+                                f"Skipping invalid image item: {type(blob_item)}"
+                            )
 
-            if valid_image_objects:
-                embed_to_post = atproto_models.AppBskyEmbedImages.Main(
-                    images=valid_image_objects
-                )  # pyright: ignore [reportOptionalMemberAccess]
-            elif image_blobs:  # If image_blobs was not empty but valid_image_objects is
-                logger.warning(
-                    "image_blobs was not empty, but no valid Image objects were found for embedding."
-                )
+                if valid_image_objects:
+                    embed_to_post = atproto_models.AppBskyEmbedImages.Main(
+                        images=valid_image_objects
+                    )
+                    logger.info("Using image embed(s) for skeet")
+                elif image_blobs:
+                    logger.warning("No valid image objects found for embedding.")
 
         reply_ref_for_this_skeet = None
         if previous_skeet_ref and root_skeet_ref:
