@@ -671,17 +671,25 @@ def bluesky_upload_media(bluesky_client, media_list, identifier_for_alt_text):
     # If we have a video file (converted GIF), try to upload it first
     mp4_files = [f for f in media_list if f.endswith(".mp4")]
     if mp4_files:
+        video_path = mp4_files[0]
+        logger.info(f"Attempting to upload video file: {video_path}")
+
+        # Get video file size and other properties
+        file_size = os.path.getsize(video_path)
+        logger.info(f"Video file size: {file_size} bytes")
         try:
             with open(mp4_files[0], "rb") as f:
                 video_data = f.read()
 
             blob_response = bluesky_client.com.atproto.repo.upload_blob(video_data)
+            logger.info(f"Blob upload response: {blob_response}")
             alt_text = f"Video animation for {identifier_for_alt_text}"
 
             # Create video embed
             video_blob = atproto_models.AppBskyEmbedVideo.Main(
                 video=blob_response.blob, alt=alt_text
             )
+            logger.info(f"Video blob: {video_blob}")
             return [video_blob]
         except Exception as e:
             logger.error(f"Failed to upload video, falling back to images: {e}")
@@ -1025,7 +1033,7 @@ def skeet(
             ):
                 # Handle video embed
                 embed_to_post = image_blobs[0]
-                logger.info("Using video embed for skeet")
+                logger.info(f"Using video embed for skeet, {embed_to_post=}")
             else:
                 # Handle image embeds
                 valid_image_objects = []
