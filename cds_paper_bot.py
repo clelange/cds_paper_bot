@@ -1506,6 +1506,12 @@ def main():
                     media_url,
                 ):
                     media_found = True
+            elif experiment == "LHCb":
+                # LHCb attaches figures as a ZIP file
+                if media_url.lower().endswith(".zip"):
+                    logger.info("Found ZIP file for LHCb: " + media_url)
+                    media_found = True
+                    media_isimage = True  # Treat ZIP as images for now
             # check if media can be downloaded
             if media_found:
                 media_url = media_url.split("?", 1)[0]
