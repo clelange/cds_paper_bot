@@ -717,6 +717,30 @@ def bluesky_upload_media(bluesky_client, media_list, identifier_for_alt_text):
     return image_blobs
 
 
+def detect_facets(text):
+    """Detect URLs in text and create facets for them."""
+    facets = []
+    # Simple URL regex pattern
+    url_pattern = r"https?://[^\s]+"
+
+    for match in re.finditer(url_pattern, text):
+        start = match.start()
+        end = match.end()
+        url = text[start:end]
+
+        # Create URI facet
+        facets.append(
+            atproto_models.AppBskyRichtextFacet.Main(
+                index=atproto_models.AppBskyRichtextFacet.ByteSlice(
+                    byteStart=start, byteEnd=end
+                ),
+                features=[atproto_models.AppBskyRichtextFacet.Link(uri=url)],
+            )
+        )
+
+    return facets if facets else None
+
+
 def split_text(
     type_hashtag,
     title,
@@ -979,6 +1003,9 @@ def skeet(
         logger.info(f"Skeet part {i + 1}: {message_text}")
         logger.debug(f"Length: {len(message_text)}")
 
+        # Create facets for URLs
+        facets = detect_facets(message_text)
+
         embed_to_post = None
         if i == 0 and image_blobs:  # Only add media to the first skeet of a thread
             if len(image_blobs) == 1 and isinstance(
@@ -1009,24 +1036,20 @@ def skeet(
                 elif image_blobs:
                     logger.warning("No valid image objects found for embedding.")
 
-        reply_ref_for_this_skeet = None
+        reply_ref = None
         if previous_skeet_ref and root_skeet_ref:
-            reply_ref_for_this_skeet = atproto_models.AppBskyFeedPost.ReplyRef(  # pyright: ignore [reportOptionalMemberAccess]
+            reply_ref = atproto_models.AppBskyFeedPost.ReplyRef(
                 parent=previous_skeet_ref, root=root_skeet_ref
             )
 
         try:
-            # Construct the record for the post
-            post_record = (
-                atproto_models.AppBskyFeedPost.Record(  # Changed from .Main to .Record
-                    text=message_text,
-                    created_at=bluesky_client.get_current_time_iso(),  # pyright: ignore [reportOptionalMemberAccess]
-                    embed=embed_to_post
-                    if i == 0
-                    else None,  # Only first post gets media
-                    reply=reply_ref_for_this_skeet,
-                    # langs=langs, # TODO: Add language detection
-                )
+            # Construct the record for the post with facets
+            post_record = atproto_models.AppBskyFeedPost.Record(
+                text=message_text,
+                facets=facets,  # Add URL facets
+                created_at=bluesky_client.get_current_time_iso(),
+                embed=embed_to_post if i == 0 else None,
+                reply=reply_ref,
             )
 
             # Prepare data for create_record
@@ -1062,7 +1085,7 @@ def skeet(
                         text=message_text,
                         created_at=bluesky_client.get_current_time_iso(),  # pyright: ignore [reportOptionalMemberAccess]
                         reply=reply_ref_for_this_skeet,
-                        # langs=langs,
+                        # langs=langs, # TODO: Add language detection
                     )
                     record_data_no_media = (
                         atproto_models.ComAtprotoRepoCreateRecord.Data(  # pyright: ignore [reportOptionalMemberAccess]
