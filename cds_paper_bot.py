@@ -323,22 +323,19 @@ def execute_command(command):
 def convert_gif_to_mp4(gif_path, output_path=None):
     """Convert GIF to MP4 video for BlueSky compatibility."""
     if output_path is None:
-        output_path = gif_path.replace(".gif", ".mp4")
+        output_path = gif_path.replace('.gif', '.mp4')
 
     try:
-        # Use FFmpeg to convert GIF to MP4
-        # -y: overwrite output file if it exists
-        # -f gif: input format is gif
-        # -pix_fmt yuv420p: pixel format compatible with most players
-        # -movflags +faststart: optimize for web streaming
-        command = f'ffmpeg -y -i "{gif_path}" -pix_fmt yuv420p -movflags +faststart "{output_path}"'
-
-        result = execute_command(command)
-        if result and os.path.exists(output_path):
-            logger.info(f"Successfully converted GIF to MP4: {output_path}")
+        command = (
+            f'ffmpeg -i {gif_path} -movflags faststart -pix_fmt yuv420p -vf '
+            f'"scale=trunc(iw/2)*2:trunc(ih/2)*2" -y {output_path}'
+        )
+        execute_command(command)
+        if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+            logger.info(f"Successfully converted {gif_path} to {output_path}")
             return output_path
         else:
-            logger.error(f"Failed to convert GIF to MP4: {gif_path}")
+            logger.error(f"MP4 conversion failed or produced empty file for {gif_path}")
             return None
     except Exception as e:
         logger.error(f"Error converting GIF to MP4: {e}")
@@ -664,130 +661,59 @@ def mastodon_upload_images(mastodon_client, image_list, post_gif):
 
 
 def bluesky_upload_media(bluesky_client, media_list, identifier_for_alt_text):
-    """Upload images and videos to BlueSky and return appropriate embed objects."""
-    if not bluesky_client or BlueskyClient is None or atproto_models is None:
+    """Upload media (images or video) to BlueSky and return blob references."""
+    if not bluesky_client:
         return []
 
     logger.info("Uploading media to BlueSky.")
-
-    # Separate images and videos
-    image_paths = []
-    video_paths = []
-
-    for media_path in sorted(media_list):
-        if media_path.lower().endswith((".mp4", ".mov", ".avi")):
-            video_paths.append(media_path)
-        else:
-            image_paths.append(media_path)
-
-    embeds = []
-
-    # Handle video uploads (BlueSky supports only one video per post)
-    if video_paths:
-        video_path = video_paths[0]  # Take the first video only
-        try:
-            with open(video_path, "rb") as f:
-                video_data = f.read()
-
-            alt_text_description = (
-                f"Video for {identifier_for_alt_text}: {os.path.basename(video_path)}"
-            )
-            max_alt_text_len = 500
-            if len(alt_text_description) > max_alt_text_len:
-                alt_text_description = (
-                    alt_text_description[: max_alt_text_len - 3] + "..."
-                )
-
-            response = bluesky_client.com.atproto.repo.upload_blob(video_data)
-
-            # Create video embed
-            video_embed = atproto_models.AppBskyEmbedVideo.Main(
-                video=atproto_models.AppBskyEmbedVideo.Video(
-                    blob=response.blob, alt=alt_text_description
-                )
-            )
-            embeds.append(video_embed)
-            logger.info(
-                f"BlueSky: Uploaded video {video_path}, blob CID: {response.blob.cid}"
-            )
-
-        except Exception as e:
-            logger.error(f"BlueSky: Failed to upload video {video_path}. Error: {e}")
-
-    # Handle image uploads (up to 4 images if no video)
-    elif image_paths:
-        image_blobs = []
-        for image_path in sorted(image_paths)[:4]:
-            try:
-                with open(image_path, "rb") as f:
-                    img_data = f.read()
-
-                alt_text_description = f"Image for {identifier_for_alt_text}: {os.path.basename(image_path)}"
-                max_alt_text_len = 500
-                if len(alt_text_description) > max_alt_text_len:
-                    alt_text_description = (
-                        alt_text_description[: max_alt_text_len - 3] + "..."
-                    )
-
-                response = bluesky_client.com.atproto.repo.upload_blob(img_data)
-                image_blobs.append(
-                    atproto_models.AppBskyEmbedImages.Image(
-                        image=response.blob, alt=alt_text_description
-                    )
-                )
-                logger.info(
-                    f"BlueSky: Uploaded {image_path}, blob CID: {response.blob.cid}"
-                )
-            except Exception as e:
-                logger.error(
-                    f"BlueSky: Failed to upload media {image_path}. Error: {e}"
-                )
-
-        if image_blobs:
-            images_embed = atproto_models.AppBskyEmbedImages.Main(images=image_blobs)
-            embeds.append(images_embed)
-
-    logger.info(f"BlueSky uploaded media: {len(embeds)} embed(s)")
-    return embeds
-
-
-def bluesky_upload_images(bluesky_client, image_list, identifier_for_alt_text):
-    """Upload images to BlueSky and return blob references."""
-    if not bluesky_client or BlueskyClient is None or atproto_models is None:
-        return []
-    logger.info("Uploading images to BlueSky.")
     image_blobs = []
-    # BlueSky allows up to 4 images
-    for image_path in sorted(image_list)[:4]:
+
+    # If we have a video file (converted GIF), try to upload it first
+    mp4_files = [f for f in media_list if f.endswith('.mp4')]
+    if mp4_files:
+        try:
+            with open(mp4_files[0], 'rb') as f:
+                video_data = f.read()
+            
+            blob_response = bluesky_client.com.atproto.repo.upload_blob(video_data)
+            alt_text = f"Video animation for {identifier_for_alt_text}"
+            
+            # Create video embed
+            video_blob = atproto_models.AppBskyEmbedVideo.Main(
+                video=blob_response.blob,
+                alt=alt_text
+            )
+            return [video_blob]
+        except Exception as e:
+            logger.error(f"Failed to upload video, falling back to images: {e}")
+            # Continue to image upload fallback
+    
+    # Fallback: Upload up to 4 static images
+    for image_path in sorted(media_list)[:4]:
+        if image_path.endswith('.mp4'):
+            continue  # Skip mp4 files in image processing
         try:
             with open(image_path, "rb") as f:
                 img_data = f.read()
-
-            alt_text_description = (
-                f"Image for {identifier_for_alt_text}: {os.path.basename(image_path)}"
-            )
+            
+            alt_text = f"Image for {identifier_for_alt_text}: {os.path.basename(image_path)}"
             # Truncate alt text if too long
-            max_alt_text_len = (
-                500  # A reasonable guess, atproto might have stricter internal limits
-            )
-            if len(alt_text_description) > max_alt_text_len:
-                alt_text_description = (
-                    alt_text_description[: max_alt_text_len - 3] + "..."
-                )
+            max_alt_text_len = 500
+            if len(alt_text) > max_alt_text_len:
+                alt_text = alt_text[:max_alt_text_len-3] + "..."
 
             response = bluesky_client.com.atproto.repo.upload_blob(img_data)
             image_blobs.append(
-                atproto_models.AppBskyEmbedImages.Image(  # pyright: ignore [reportOptionalMemberAccess]
-                    image=response.blob, alt=alt_text_description
+                atproto_models.AppBskyEmbedImages.Image(
+                    image=response.blob,
+                    alt=alt_text
                 )
             )
-            logger.info(
-                f"BlueSky: Uploaded {image_path}, blob CID: {response.blob.cid}"
-            )
+            logger.info(f"BlueSky: Uploaded {image_path}")
         except Exception as e:
             logger.error(f"BlueSky: Failed to upload media {image_path}. Error: {e}")
-            # Continue to try uploading other images if one fails
-    logger.info(f"BlueSky uploaded blobs: {len(image_blobs)}")
+            continue
+
     return image_blobs
 
 
@@ -1751,165 +1677,89 @@ def main():
                 )
 
             # BlueSky processing and upload
-            bluesky_image_blobs = []  # Initialize to empty list
-            if bluesky_client and do_skeet:  # Check client and if we intend to skeet
-                current_post_gif_for_bluesky = (
-                    post_gif  # Start with global/user preference for GIF
-                )
-
-                # Attempt 1: Process and upload as GIF (if post_gif is True) or static images
+            if bluesky_client and do_skeet:
+                # First attempt: Create GIF and convert to MP4
                 try:
-                    logger.info(
-                        f"BlueSky: Initial media processing (post_gif={current_post_gif_for_bluesky})."
+                    logger.info("BlueSky: Processing images for video conversion")
+                    gif_list = process_images(
+                        outdir, downloaded_image_list, post_gif=True
                     )
-                    # Use a different variable name to avoid confusion if process_images is called again for fallback
-                    image_list_for_bluesky_attempt1 = process_images(
-                        outdir,
-                        downloaded_image_list,
-                        post_gif=current_post_gif_for_bluesky,
-                    )
-                    if image_list_for_bluesky_attempt1:
-                        bluesky_embeds = bluesky_upload_media(
-                            bluesky_client, image_list_for_bluesky_attempt1, identifier
-                        )
-                    else:
-                        logger.info("BlueSky: No images processed in first attempt.")
-                        # bluesky_image_blobs remains empty
-                except Exception as e_bsky_proc1:
-                    logger.error(
-                        f"BlueSky: Error during initial media processing/upload attempt: {e_bsky_proc1}"
-                    )
-                    bluesky_image_blobs = []  # Ensure it's empty on error
-
-                # Attempt 2 (Fallback): If GIF was attempted (current_post_gif_for_bluesky was true)
-                # and it resulted in no blobs, try static images.
-                if not bluesky_image_blobs and current_post_gif_for_bluesky:
-                    logger.info(
-                        "BlueSky: GIF upload attempt failed or resulted in no blobs. Falling back to static images."
-                    )
-                    # Force static images for fallback by setting post_gif for this specific call to False
-                    try:
-                        logger.info(
-                            "BlueSky: Fallback media processing (post_gif=False)."
-                        )
-                        image_list_for_bluesky_fallback = process_images(
-                            outdir,
-                            downloaded_image_list,
-                            post_gif=False,  # Explicitly False for fallback
-                        )
-                        if image_list_for_bluesky_fallback:
-                            bluesky_image_blobs = bluesky_upload_images(
-                                bluesky_client,
-                                image_list_for_bluesky_fallback,
-                                identifier,
+                    if gif_list and len(gif_list) > 0:
+                        # Convert the GIF to MP4
+                        mp4_path = convert_gif_to_mp4(gif_list[0])
+                        if mp4_path:
+                            # Try uploading the MP4
+                            media_list_for_bluesky = [mp4_path]
+                            bluesky_image_blobs = bluesky_upload_media(
+                                bluesky_client, media_list_for_bluesky, identifier
                             )
-                        else:
-                            logger.info(
-                                "BlueSky: No images processed in fallback attempt."
-                            )
-                            # bluesky_image_blobs remains empty
-                    except Exception as e_bsky_proc_fallback:
-                        logger.error(
-                            f"BlueSky: Error during fallback media processing/upload: {e_bsky_proc_fallback}"
+                    
+                    if not bluesky_image_blobs:
+                        logger.info("BlueSky: Video upload failed or produced no blobs, falling back to static images")
+                        # Process images as static PNGs
+                        image_list_for_bluesky = process_images(
+                            outdir, downloaded_image_list, post_gif=False
                         )
-                        bluesky_image_blobs = []  # Ensure it's empty on error
-
-                if not bluesky_image_blobs:
-                    logger.info(
-                        "BlueSky: All media processing/upload attempts failed or yielded no images."
-                    )
+                        if image_list_for_bluesky:
+                            bluesky_image_blobs = bluesky_upload_media(
+                                bluesky_client, image_list_for_bluesky, identifier
+                            )
+                except Exception as e:
+                    logger.error(f"BlueSky: Error during media processing/upload: {e}")
+                    bluesky_image_blobs = []
 
                 logger.debug(
-                    f"BlueSky image blobs after all attempts: {len(bluesky_image_blobs)} blobs."
+                    f"BlueSky media blobs after all attempts: {len(bluesky_image_blobs)} blobs."
                 )
 
-        title = post.title
-        link = post.link
-        if use_arxiv_link and arxiv_id:
-            link = arxiv_link
+            title = post.title
+            link = post.link
+            if use_arxiv_link and arxiv_id:
+                link = arxiv_link
 
-        prelim_result = False
-        for item in PRELIM:
-            if identifier.find(item) >= 0:
-                prelim_result = True
-                logger.info("This is a preliminary result.")
+            prelim_result = False
+            for item in PRELIM:
+                if identifier.find(item) >= 0:
+                    prelim_result = True
+                    logger.info("This is a preliminary result.")
 
-        conf_hashtags = ""
-        # use only for PAS/CONF notes:
-        if prelim_result:
-            conf_hashtags = " ".join(
-                filter(None, (conf.is_now(post["published"]) for conf in CONFERENCES))
-            )
-            logger.info(f"Conference hashtags: {conf_hashtags}")
+            conf_hashtags = ""
+            # use only for PAS/CONF notes:
+            if prelim_result:
+                conf_hashtags = " ".join(
+                    filter(None, (conf.is_now(post["published"]) for conf in CONFERENCES))
+                )
+                logger.info(f"Conference hashtags: {conf_hashtags}")
 
-        type_hashtag = "New result"
-        if prelim_result:
-            if experiment == "CMS":
-                type_hashtag = "#CMSPAS"
+            type_hashtag = "New result"
+            if prelim_result:
+                if experiment == "CMS":
+                    type_hashtag = "#CMSPAS"
+                else:
+                    type_hashtag = f"#{experiment}conf"
             else:
-                type_hashtag = f"#{experiment}conf"
-        else:
-            type_hashtag = f"#{experiment}paper"
-            # For initial submission to arXiv there won't be any pictures,
-            # but the submission happens days before the analysis appears on arXiv
-            # while the CDS entry with the arXiv identifier comes after the
-            # availability on arXiv, so let's give people a heads-up of what's coming.
-            if (experiment == "CMS" or experiment == "LHCb") and identifier.startswith(
-                "CERN-EP"
-            ):
-                type_hashtag += " soon on arXiv"
+                type_hashtag = f"#{experiment}paper"
+                # For initial submission to arXiv there won't be any pictures,
+                # but the submission happens days before the analysis appears on arXiv
+                # while the CDS entry with the arXiv identifier comes after the
+                # availability on arXiv, so let's give people a heads-up of what's coming.
+                if (experiment == "CMS" or experiment == "LHCb") and identifier.startswith(
+                    "CERN-EP"
+                ):
+                    type_hashtag += " soon on arXiv"
 
-        title_formatted = format_title(title)
-        if sys.version_info[0] < 3:
-            title_formatted = title_formatted.encode("utf8")
+            title_formatted = format_title(title)
+            if sys.version_info[0] < 3:
+                title_formatted = title_formatted.encode("utf8")
 
-        # title_temp = type_hashtag + ": " + title_formatted + " (" + identifier + ") " + link + " " + conf_hashtags
-        # logger.info(title_temp)
+            # title_temp = type_hashtag + ": " + title_formatted + " (" + identifier + ") " + link + " " + conf_hashtags
+            # logger.info(title_temp)
 
-        # skip entries without media for ATLAS
-        if downloaded_image_list or experiment != "ATLAS":
-            if twitter_client:
-                tweet_count += 1
-                if not dry_run:
-                    tweet_response = tweet(
-                        twitter_client["v2"],
-                        type_hashtag,
-                        title_formatted,
-                        identifier,
-                        link,
-                        conf_hashtags,
-                        phys_hashtags,
-                        twitter_image_ids,
-                        post_gif,
-                        config["AUTH"]["BOT_HANDLE"],
-                    )
-                    if not tweet_response:
-                        # try to recover since something went wrong
-                        # first, try to use individual images instead of GIF
-                        if post_gif:
-                            if downloaded_image_list:
-                                logger.info("Trying to tweet without GIF")
-                                image_list = process_images(
-                                    outdir, downloaded_image_list, post_gif=False
-                                )
-                                twitter_image_ids = twitter_upload_images(
-                                    twitter_client["v1"], image_list, post_gif=False
-                                )
-                                tweet_response = tweet(
-                                    twitter_client["v2"],
-                                    type_hashtag,
-                                    title_formatted,
-                                    identifier,
-                                    link,
-                                    conf_hashtags,
-                                    phys_hashtags,
-                                    twitter_image_ids,
-                                    post_gif=False,
-                                    bot_handle=config["AUTH"]["BOT_HANDLE"],
-                                )
-                    if not tweet_response:
-                        # second, try to tweet without image
-                        logger.info("Trying to tweet without images")
+            # skip entries without media for ATLAS
+            if downloaded_image_list or experiment != "ATLAS":
+                if twitter_client:
+                    tweet_count += 1
+                    if not dry_run:
                         tweet_response = tweet(
                             twitter_client["v2"],
                             type_hashtag,
@@ -1918,54 +1768,94 @@ def main():
                             link,
                             conf_hashtags,
                             phys_hashtags,
-                            image_ids=[],
-                            post_gif=False,
-                            bot_handle=config["AUTH"]["BOT_HANDLE"],
+                            twitter_image_ids,
+                            post_gif,
+                            config["AUTH"]["BOT_HANDLE"],
                         )
-                    if tweet_response:
-                        store_id(identifier, post["feed_id"], prefix="TWITTER_")
-                else:
-                    logger.info("Tweet information:")
-                    logger.info(title_formatted)
-                    logger.info("identifier: " + identifier)
-                    logger.info("link: " + link)
-                    logger.info("type_hashtag: " + type_hashtag)
-                    logger.info("conf_hashtags: " + conf_hashtags)
-                    logger.info("phys_hashtags: " + phys_hashtags)
-            if mastodon_client:
-                toot_count += 1
-                if not dry_run:
-                    logger.info(
-                        "Waiting 10 seconds before first toot attempt for this item."
-                    )
-                    time.sleep(10)
+                        if not tweet_response:
+                            # try to recover since something went wrong
+                            # first, try to use individual images instead of GIF
+                            if post_gif:
+                                if downloaded_image_list:
+                                    logger.info("Trying to tweet without GIF")
+                                    image_list = process_images(
+                                        outdir, downloaded_image_list, post_gif=False
+                                    )
+                                    twitter_image_ids = twitter_upload_images(
+                                        twitter_client["v1"], image_list, post_gif=False
+                                    )
+                                    tweet_response = tweet(
+                                        twitter_client["v2"],
+                                        type_hashtag,
+                                        title_formatted,
+                                        identifier,
+                                        link,
+                                        conf_hashtags,
+                                        phys_hashtags,
+                                        twitter_image_ids,
+                                        post_gif=False,
+                                        bot_handle=config["AUTH"]["BOT_HANDLE"],
+                                    )
+                            if not tweet_response:
+                                # second, try to tweet without image
+                                logger.info("Trying to tweet without images")
+                                tweet_response = tweet(
+                                    twitter_client["v2"],
+                                    type_hashtag,
+                                    title_formatted,
+                                    identifier,
+                                    link,
+                                    conf_hashtags,
+                                    phys_hashtags,
+                                    image_ids=[],
+                                    post_gif=False,
+                                    bot_handle=config["AUTH"]["BOT_HANDLE"],
+                                )
+                        if tweet_response:
+                            store_id(identifier, post["feed_id"], prefix="TWITTER_")
+                    else:
+                        logger.info("Tweet information:")
+                        logger.info(title_formatted)
+                        logger.info("identifier: " + identifier)
+                        logger.info("link: " + link)
+                        logger.info("type_hashtag: " + type_hashtag)
+                        logger.info("conf_hashtags: " + conf_hashtags)
+                        logger.info("phys_hashtags: " + phys_hashtags)
+                if mastodon_client:
+                    toot_count += 1
+                    if not dry_run:
+                        logger.info(
+                            "Waiting 10 seconds before first toot attempt for this item."
+                        )
+                        time.sleep(10)
 
-                    mastodon_image_ids = []
-                    actual_post_gif_for_mastodon = (
-                        post_gif  # Variable to track if GIF is used for this toot
-                    )
+                        mastodon_image_ids = []
+                        actual_post_gif_for_mastodon = (
+                            post_gif  # Variable to track if GIF is used for this toot
+                        )
 
-                    if downloaded_image_list:
-                        try:
-                            # Attempt 1: Process and upload (possibly as GIF)
-                            logger.info(
-                                f"Mastodon: Initial media processing (post_gif={actual_post_gif_for_mastodon})."
-                            )
-                            image_list_for_mastodon = process_images(
-                                outdir,
-                                downloaded_image_list,
-                                actual_post_gif_for_mastodon,
-                            )
-                            mastodon_image_ids = mastodon_upload_images(
-                                mastodon_client,
-                                image_list_for_mastodon,
-                                actual_post_gif_for_mastodon,
-                            )
-                        except (
-                            mastodon.MastodonError
-                        ) as e:  # Changed from MastodonAPIError to MastodonError
-                            logger.warning(
-                                f"Mastodon: Media upload attempt 1 failed: {e}"
+                        if downloaded_image_list:
+                            try:
+                                # Attempt 1: Process and upload (possibly as GIF)
+                                logger.info(
+                                    f"Mastodon: Initial media processing (post_gif={actual_post_gif_for_mastodon})."
+                                )
+                                image_list_for_mastodon = process_images(
+                                    outdir,
+                                    downloaded_image_list,
+                                    actual_post_gif_for_mastodon,
+                                )
+                                mastodon_image_ids = mastodon_upload_images(
+                                   (
+                                    mastodon_client,
+                                    image_list_for_mastodon,
+                                    actual_post_gif_for_mastodon,
+                                )
+                            except (
+                                mastodon.MastodonError
+                            ) as e:  # Changed from MastodonAPIError to MastodonError
+                                logger.warning(
+                                    f"Mastodon: Media upload attempt 1 failed: {e}"
                             )
                             # Check if it's the specific API error we want to handle for GIF fallback
                             if (
@@ -2003,9 +1893,9 @@ def main():
                                     f"Mastodon: Unhandled MastodonError or non-422 API error during media upload: {e}"
                                 )
                                 mastodon_image_ids = []  # Failed to upload any media
-                        except Exception as e_generic:  # Catch other potential errors (e.g., from process_images)
-                            logger.error(
-                                f"Mastodon: Unexpected error during media preparation: {e_generic}"
+                            except Exception as e_generic:  # Catch other potential errors (e.g., from process_images)
+                                logger.error(
+                                    f"Mastodon: Unexpected error during media preparation: {e_generic}"
                             )
                             mastodon_image_ids = []  # Failed to prepare/upload any media
 
