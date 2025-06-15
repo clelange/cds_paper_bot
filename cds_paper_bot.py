@@ -718,20 +718,35 @@ def bluesky_upload_media(bluesky_client, media_list, identifier_for_alt_text):
 
 
 def detect_facets(text):
-    """Detect URLs in text and create facets for them."""
+    """Detect URLs and hashtags in text and create facets for them."""
     facets = []
-    # Simple URL regex pattern
-    url_pattern = r"https?://[^\s]+"
 
+    # URL pattern
+    url_pattern = r"https?://[^\s]+"
+    # Hashtag pattern - matches # followed by word chars (excluding spaces)
+    hashtag_pattern = r"#[\w]+"
+
+    # Process URLs
     for match in re.finditer(url_pattern, text):
         start = len(text[: match.start()].encode("utf-8"))
         end = len(text[: match.end()].encode("utf-8"))
         url = text[match.start() : match.end()]
 
-        # Create facet dictionary format that BlueSky expects
         facet = {
             "index": {"byteStart": start, "byteEnd": end},
             "features": [{"$type": "app.bsky.richtext.facet#link", "uri": url}],
+        }
+        facets.append(facet)
+
+    # Process hashtags
+    for match in re.finditer(hashtag_pattern, text):
+        start = len(text[: match.start()].encode("utf-8"))
+        end = len(text[: match.end()].encode("utf-8"))
+        tag = text[match.start() + 1 : match.end()]  # Remove the # symbol
+
+        facet = {
+            "index": {"byteStart": start, "byteEnd": end},
+            "features": [{"$type": "app.bsky.richtext.facet#tag", "tag": tag}],
         }
         facets.append(facet)
 
