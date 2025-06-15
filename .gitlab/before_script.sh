@@ -27,6 +27,12 @@ fi
 if [ -n "$MASTODON_ACCESS_TOKEN" ]; then
     echo "MASTODON_ACCESS_TOKEN = ${MASTODON_ACCESS_TOKEN}" >> auth.ini
 fi
+if [ -n "$BLUESKY_HANDLE" ]; then
+    echo "BLUESKY_HANDLE = ${BLUESKY_HANDLE}" >> auth.ini
+fi
+if [ -n "$BLUESKY_APP_PASSWORD" ]; then
+    echo "BLUESKY_APP_PASSWORD = ${BLUESKY_APP_PASSWORD}" >> auth.ini
+fi
 # Create the SSH directory and give it the right permissions
 mkdir -p ~/.ssh
 chmod 700 ~/.ssh
