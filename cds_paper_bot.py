@@ -717,6 +717,30 @@ def bluesky_upload_media(bluesky_client, media_list, identifier_for_alt_text):
     return image_blobs
 
 
+def detect_facets(text):
+    """Detect URLs in text and create facets for them."""
+    facets = []
+    # Simple URL regex pattern
+    url_pattern = r"https?://[^\s]+"
+
+    for match in re.finditer(url_pattern, text):
+        start = match.start()
+        end = match.end()
+        url = text[start:end]
+
+        # Create URI facet
+        facets.append(
+            atproto_models.AppBskyRichtextFacet.Main(
+                index=atproto_models.AppBskyRichtextFacet.ByteSlice(
+                    byteStart=start, byteEnd=end
+                ),
+                features=[atproto_models.AppBskyRichtextFacet.Link(uri=url)],
+            )
+        )
+
+    return facets if facets else None
+
+
 def split_text(
     type_hashtag,
     title,
@@ -940,10 +964,10 @@ def skeet(
     link,
     conf_hashtags,
     phys_hashtags,
-    image_blobs,
+    image_blobs,  # List of blob objects from bluesky_upload_images
     bot_handle,
-    previous_skeet_ref=None,
-    root_skeet_ref=None,
+    previous_skeet_ref=None,  # StrongRef of the previous skeet in a thread
+    root_skeet_ref=None,  # StrongRef of the root skeet in a thread
 ):
     """Post (skeet) the new results to BlueSky."""
     if (
@@ -955,7 +979,12 @@ def skeet(
         logger.error("BlueSky client or models not available. Skipping skeet.")
         return None
 
+    # BlueSky allows 300 chars per post.
+    # Facets (links, mentions) count towards this limit.
+    # Link cards are not yet fully supported by atproto for creation in the same way as text facets.
+    # We will include the link directly in the text.
     skeet_allowed_length = 300
+
     message_list = split_text(
         type_hashtag,
         title,
@@ -968,28 +997,25 @@ def skeet(
     )
 
     logger.info("Creating skeet ...")
-    response_summary = {}
+    response_summary = {}  # To store the URI and CID of the last successful skeet
 
     for i, message_text in enumerate(message_list):
         logger.info(f"Skeet part {i + 1}: {message_text}")
         logger.debug(f"Length: {len(message_text)}")
 
-        # Create link facet if URL is present
-        facets = []
-        if link in message_text:
-            link_facet = create_link_facet(message_text, link)
-            if link_facet:
-                facets.append(link_facet)
+        # Create facets for URLs
+        facets = detect_facets(message_text)
 
-        # Handle media embeds
         embed_to_post = None
-        if i == 0 and image_blobs:
+        if i == 0 and image_blobs:  # Only add media to the first skeet of a thread
             if len(image_blobs) == 1 and isinstance(
                 image_blobs[0], atproto_models.AppBskyEmbedVideo.Main
             ):
+                # Handle video embed
                 embed_to_post = image_blobs[0]
                 logger.info("Using video embed for skeet")
             else:
+                # Handle image embeds
                 valid_image_objects = []
                 if isinstance(image_blobs, list):
                     for blob_item in image_blobs:
@@ -1010,7 +1036,6 @@ def skeet(
                 elif image_blobs:
                     logger.warning("No valid image objects found for embedding.")
 
-        # Handle reply references
         reply_ref = None
         if previous_skeet_ref and root_skeet_ref:
             reply_ref = atproto_models.AppBskyFeedPost.ReplyRef(
@@ -1018,61 +1043,69 @@ def skeet(
             )
 
         try:
-            # Create post record with facets
+            # Construct the record for the post with facets
             post_record = atproto_models.AppBskyFeedPost.Record(
                 text=message_text,
+                facets=facets,  # Add URL facets
                 created_at=bluesky_client.get_current_time_iso(),
                 embed=embed_to_post if i == 0 else None,
                 reply=reply_ref,
-                facets=facets if facets else None,
             )
 
-            record_data = atproto_models.ComAtprotoRepoCreateRecord.Data(
-                repo=bluesky_client.me.did,
-                collection=atproto_models.ids.AppBskyFeedPost,
-                record=post_record.model_dump(exclude_none=True),
+            # Prepare data for create_record
+            record_data = atproto_models.ComAtprotoRepoCreateRecord.Data(  # pyright: ignore [reportOptionalMemberAccess]
+                repo=bluesky_client.me.did,  # pyright: ignore [reportOptionalMemberAccess, reportUnknownMemberType]
+                collection=atproto_models.ids.AppBskyFeedPost,  # pyright: ignore [reportOptionalMemberAccess]
+                record=post_record.model_dump(
+                    exclude_none=True
+                ),  # Convert record to dict
             )
 
-            response = bluesky_client.com.atproto.repo.create_record(data=record_data)
+            response = bluesky_client.com.atproto.repo.create_record(data=record_data)  # pyright: ignore [reportOptionalMemberAccess, reportUnknownMemberType]
+
             logger.debug(f"Skeet part {i + 1} response: {response}")
+            current_skeet_strong_ref = atproto_models.create_strong_ref(response)  # pyright: ignore [reportOptionalMemberAccess]
 
-            current_skeet_strong_ref = atproto_models.create_strong_ref(response)
-            response_summary = {"uri": response.uri, "cid": response.cid}
+            response_summary = {"uri": response.uri, "cid": response.cid}  # pyright: ignore [reportOptionalMemberAccess, reportAttributeAccessIssue]
 
-            if i == 0:
-                root_skeet_ref = current_skeet_strong_ref
-            previous_skeet_ref = current_skeet_strong_ref
+            if i == 0:  # If this is the first skeet
+                root_skeet_ref = current_skeet_strong_ref  # It becomes the root for subsequent replies
+            previous_skeet_ref = (
+                current_skeet_strong_ref  # Current skeet becomes parent for the next
+            )
 
-        except BlueskyAtpApiError as e:
+        except BlueskyAtpApiError as e:  # pyright: ignore [reportPossiblyUnboundVariable]
             logger.error(f"BlueSky API error during skeet part {i + 1}: {e}")
-            if i == 0 and embed_to_post:
+            if i == 0 and embed_to_post:  # If first post with media failed
                 logger.info(
                     "BlueSky: Skeet with media failed. Attempting skeet without media."
                 )
                 try:
-                    post_record_no_media = atproto_models.AppBskyFeedPost.Record(
+                    post_record_no_media = atproto_models.AppBskyFeedPost.Record(  # Changed from .Main to .Record
                         text=message_text,
-                        created_at=bluesky_client.get_current_time_iso(),
-                        reply=reply_ref,
-                        facets=facets if facets else None,
+                        created_at=bluesky_client.get_current_time_iso(),  # pyright: ignore [reportOptionalMemberAccess]
+                        reply=reply_ref_for_this_skeet,
+                        # langs=langs, # TODO: Add language detection
                     )
                     record_data_no_media = (
-                        atproto_models.ComAtprotoRepoCreateRecord.Data(
-                            repo=bluesky_client.me.did,
-                            collection=atproto_models.ids.AppBskyFeedPost,
+                        atproto_models.ComAtprotoRepoCreateRecord.Data(  # pyright: ignore [reportOptionalMemberAccess]
+                            repo=bluesky_client.me.did,  # pyright: ignore [reportOptionalMemberAccess, reportUnknownMemberType]
+                            collection=atproto_models.ids.AppBskyFeedPost,  # pyright: ignore [reportOptionalMemberAccess]
                             record=post_record_no_media.model_dump(exclude_none=True),
                         )
                     )
                     response = bluesky_client.com.atproto.repo.create_record(
                         data=record_data_no_media
-                    )
+                    )  # pyright: ignore [reportOptionalMemberAccess, reportUnknownMemberType]
+
                     logger.debug(
                         f"Skeet part {i + 1} (no media fallback) response: {response}"
                     )
                     current_skeet_strong_ref = atproto_models.create_strong_ref(
                         response
-                    )
-                    response_summary = {"uri": response.uri, "cid": response.cid}
+                    )  # pyright: ignore [reportOptionalMemberAccess]
+                    response_summary = {"uri": response.uri, "cid": response.cid}  # pyright: ignore [reportOptionalMemberAccess, reportAttributeAccessIssue]
+
                     if i == 0:
                         root_skeet_ref = current_skeet_strong_ref
                     previous_skeet_ref = current_skeet_strong_ref
@@ -1080,35 +1113,156 @@ def skeet(
                     logger.error(
                         f"BlueSky: Skeet without media (fallback) also failed for part {i + 1}: {e_fallback}"
                     )
-                    return None
-            else:
-                return None
+                    return None  # Failed even without media
+            else:  # If non-first post failed, or first post without media failed
+                return None  # Stop trying for this item
         except Exception as e:
             logger.error(f"Generic error during skeet part {i + 1}: {e}")
-            return None
+            # Similar fallback for generic errors on the first post with media
+            if i == 0 and embed_to_post:
+                logger.info(
+                    "BlueSky: Skeet with media failed (generic error). Attempting skeet without media."
+                )
+                try:
+                    post_record_no_media_generic = atproto_models.AppBskyFeedPost.Record(  # Changed from .Main to .Record
+                        text=message_text,
+                        created_at=bluesky_client.get_current_time_iso(),  # pyright: ignore [reportOptionalMemberAccess]
+                        reply=reply_ref_for_this_skeet,
+                        # langs=langs,
+                    )
+                    record_data_no_media_generic = (
+                        atproto_models.ComAtprotoRepoCreateRecord.Data(  # pyright: ignore [reportOptionalMemberAccess]
+                            repo=bluesky_client.me.did,  # pyright: ignore [reportOptionalMemberAccess, reportUnknownMemberType]
+                            collection=atproto_models.ids.AppBskyFeedPost,  # pyright: ignore [reportOptionalMemberAccess]
+                            record=post_record_no_media_generic.model_dump(
+                                exclude_none=True
+                            ),
+                        )
+                    )
+                    response = bluesky_client.com.atproto.repo.create_record(
+                        data=record_data_no_media_generic
+                    )  # pyright: ignore [reportOptionalMemberAccess, reportUnknownMemberType]
 
+                    logger.debug(
+                        f"Skeet part {i + 1} (no media fallback, generic error) response: {response}"
+                    )
+                    current_skeet_strong_ref = atproto_models.create_strong_ref(
+                        response
+                    )  # pyright: ignore [reportOptionalMemberAccess]
+                    response_summary = {"uri": response.uri, "cid": response.cid}  # pyright: ignore [reportOptionalMemberAccess, reportAttributeAccessIssue]
+
+                    if i == 0:
+                        root_skeet_ref = current_skeet_strong_ref
+                    previous_skeet_ref = current_skeet_strong_ref
+                except Exception as e_fallback_generic:
+                    logger.error(
+                        f"BlueSky: Skeet without media (fallback after generic error) also failed for part {i + 1}: {e_fallback_generic}"
+                    )
+                    return None
+            else:
+                return None  # Stop trying for this item
+
+        # If there are more messages, wait a bit before posting the next part of the thread
         if i < len(message_list) - 1:
-            time.sleep(2)
+            time.sleep(2)  # Short delay for threading
+
+    return response_summary  # Return the URI and CID of the last (or only) skeet
+
+
+def skeet_with_media(
+    bluesky_client,
+    type_hashtag,
+    title,
+    identifier,
+    link,
+    conf_hashtags,
+    phys_hashtags,
+    media_embeds,  # List of embed objects from bluesky_upload_media
+    bot_handle,
+):
+    """Post (skeet) the new results to BlueSky with video/image support."""
+    if not bluesky_client:
+        return None
+
+    logger.info("Creating skeet with media...")
+    skeet_allowed_length = 300
+
+    message_list = split_text(
+        type_hashtag,
+        title,
+        identifier,
+        link,
+        conf_hashtags,
+        phys_hashtags,
+        skeet_allowed_length,
+        bot_handle,
+    )
+
+    previous_skeet_ref = None
+    root_skeet_ref = None
+    response_summary = {}
+
+    for i, message_text in enumerate(message_list):
+        logger.info(f"Skeet part {i + 1}: {message_text}")
+        logger.debug(f"Length: {len(message_text)}")
+
+        # Only add media to the first skeet
+        embed_to_post = None
+        if i == 0 and media_embeds:
+            embed_to_post = media_embeds[0]  # Use the first (and typically only) embed
+
+        reply_ref = None
+        if previous_skeet_ref:
+            reply_ref = atproto_models.AppBskyFeedPost.ReplyRef(
+                parent=previous_skeet_ref, root=root_skeet_ref
+            )
+
+        try:
+            post_record = atproto_models.AppBskyFeedPost.Record(
+                text=message_text,
+                created_at=bluesky_client.get_current_time_iso(),
+                embed=embed_to_post,
+                reply=reply_ref,
+            )
+
+            response = bluesky_client.com.atproto.repo.create_record(
+                repo=bluesky_client.me.did,
+                collection=atproto_models.ids.AppBskyFeedPost,
+                record=post_record.model_dump(exclude_none=True),
+            )
+            logger.debug(f"BlueSky response: {response}")
+
+            current_skeet_strong_ref = atproto_models.create_strong_ref(response)
+            if i == 0:
+                root_skeet_ref = current_skeet_strong_ref
+                response_summary = {"uri": response.uri, "cid": response.cid}
+            previous_skeet_ref = current_skeet_strong_ref
+
+        except Exception as e:
+            logger.error(f"Error during skeet part {i + 1}: {e}")
+            return None
 
     return response_summary
 
 
-def create_link_facet(text, link_url):
-    """Create a link facet for BlueSky posts."""
-    # Find the link position in the text
-    start = text.find(link_url)
-    if start == -1:
-        return None
+def check_id_exists(identifier, feed_id, prefix=""):
+    """Check with ID of the analysis already exists in text file to avoid tweeting again."""
+    txt_file_name = f"{prefix}{feed_id}.txt"
+    # create file if it doesn't exist yet
+    if not os.path.isfile(txt_file_name):
+        open(txt_file_name, "a").close()
+    with open(txt_file_name) as txt_file:
+        for line in txt_file:
+            if identifier == line.strip("\n"):
+                return True
+    return False
 
-    # Create the facet
-    return {
-        "index": {
-            "byteStart": len(text[:start].encode("utf-8")),
-            "byteEnd": len(text[:start].encode("utf-8"))
-            + len(link_url.encode("utf-8")),
-        },
-        "features": [{"$type": "app.bsky.richtext.facet#link", "uri": link_url}],
-    }
+
+def store_id(identifier, feed_id, prefix=""):
+    """Store ID of the analysis in text file to avoid tweeting again."""
+    txt_file_name = f"{prefix}{feed_id}.txt"
+    with open(txt_file_name, "a") as txt_file:
+        txt_file.write("%s\n" % identifier)
 
 
 def main():
@@ -1765,64 +1919,60 @@ def main():
                                     # This is a MastodonError that is not the specific 422 GIF error,
                                     # or it was a MastodonAPIError not fitting the criteria.
                                     logger.error(
-                                        f"Mastodon: Media upload failed (MastodonError was not a 422 GIF error or GIF not attempted): {e}"
+                                        f"Mastodon: Unhandled MastodonError or non-422 API error during media upload: {e}"
                                     )
                                     mastodon_image_ids = []  # Failed to upload any media
-                            except Exception as e_generic:  # Catch other errors like from process_images in the first attempt
+                            except Exception as e_generic:  # Catch other potential errors (e.g., from process_images)
                                 logger.error(
-                                    f"Mastodon: Unexpected error during initial media preparation/upload: {e_generic}"
+                                    f"Mastodon: Unexpected error during media preparation: {e_generic}"
                                 )
-                                mastodon_image_ids = []
+                                mastodon_image_ids = []  # Failed to prepare/upload any media
 
-                        # Proceed with tooting attempts
-                        toot_response = None
-                        max_retry = 10
-                        for attempt_num in range(max_retry):
-                            toot_response = toot(
-                                mastodon_client,
-                                type_hashtag,
-                                title_formatted,
-                                identifier,
-                                link,
-                                conf_hashtags,
-                                phys_hashtags,
-                                mastodon_image_ids,  # Use the (possibly empty or fallback) list of IDs
-                                actual_post_gif_for_mastodon,  # Use the final decision on GIF status
-                                config["AUTH"]["MASTODON_BOT_HANDLE"],
-                            )
-                            if toot_response:
-                                store_id(
-                                    identifier, post["feed_id"], prefix="MASTODON_"
-                                )
-                                break
-                            # If toot failed, and it's not the last attempt, log and wait
-                            if not toot_response and attempt_num < max_retry - 1:
-                                logger.info(
-                                    f"Mastodon: Toot attempt {attempt_num + 1}/{max_retry} failed. Waiting 10 seconds before next attempt."
-                                )
-                                time.sleep(10)
-
-                        # Final fallback: If all toot attempts failed and images were originally present (implying media was intended)
-                        if not toot_response and downloaded_image_list:
+                    # Proceed with tooting attempts
+                    toot_response = None
+                    max_retry = 10
+                    for attempt_num in range(max_retry):
+                        toot_response = toot(
+                            mastodon_client,
+                            type_hashtag,
+                            title_formatted,
+                            identifier,
+                            link,
+                            conf_hashtags,
+                            phys_hashtags,
+                            mastodon_image_ids,  # Use the (possibly empty or fallback) list of IDs
+                            actual_post_gif_for_mastodon,  # Use the final decision on GIF status
+                            config["AUTH"]["MASTODON_BOT_HANDLE"],
+                        )
+                        if toot_response:
+                            store_id(identifier, post["feed_id"], prefix="MASTODON_")
+                            break
+                        # If toot failed, and it's not the last attempt, log and wait
+                        if not toot_response and attempt_num < max_retry - 1:
                             logger.info(
-                                "Mastodon: All toot attempts (possibly with media) failed. Attempting a final toot explicitly without media."
+                                f"Mastodon: Toot attempt {attempt_num + 1}/{max_retry} failed. Waiting 10 seconds before next attempt."
                             )
-                            final_fallback_toot_response = toot(
-                                mastodon_client,
-                                type_hashtag,
-                                title_formatted,
-                                identifier,
-                                link,
-                                conf_hashtags,
-                                phys_hashtags,
-                                image_ids=[],  # Explicitly no media
-                                post_gif=False,  # GIF status irrelevant here
-                                bot_handle=config["AUTH"]["MASTODON_BOT_HANDLE"],
-                            )
-                            if final_fallback_toot_response:
-                                store_id(
-                                    identifier, post["feed_id"], prefix="MASTODON_"
-                                )
+                            time.sleep(10)
+
+                    # Final fallback: If all toot attempts failed and images were originally present (implying media was intended)
+                    if not toot_response and downloaded_image_list:
+                        logger.info(
+                            "Mastodon: All toot attempts (possibly with media) failed. Attempting a final toot explicitly without media."
+                        )
+                        final_fallback_toot_response = toot(
+                            mastodon_client,
+                            type_hashtag,
+                            title_formatted,
+                            identifier,
+                            link,
+                            conf_hashtags,
+                            phys_hashtags,
+                            image_ids=[],  # Explicitly no media
+                            post_gif=False,  # GIF status irrelevant here
+                            bot_handle=config["AUTH"]["MASTODON_BOT_HANDLE"],
+                        )
+                        if final_fallback_toot_response:
+                            store_id(identifier, post["feed_id"], prefix="MASTODON_")
 
             if bluesky_client and do_skeet:
                 skeet_count += 1
