@@ -323,11 +323,11 @@ def execute_command(command):
 def convert_gif_to_mp4(gif_path, output_path=None):
     """Convert GIF to MP4 video for BlueSky compatibility."""
     if output_path is None:
-        output_path = gif_path.replace('.gif', '.mp4')
+        output_path = gif_path.replace(".gif", ".mp4")
 
     try:
         command = (
-            f'ffmpeg -i {gif_path} -movflags faststart -pix_fmt yuv420p -vf '
+            f"ffmpeg -i {gif_path} -movflags faststart -pix_fmt yuv420p -vf "
             f'"scale=trunc(iw/2)*2:trunc(ih/2)*2" -y {output_path}'
         )
         execute_command(command)
@@ -669,44 +669,44 @@ def bluesky_upload_media(bluesky_client, media_list, identifier_for_alt_text):
     image_blobs = []
 
     # If we have a video file (converted GIF), try to upload it first
-    mp4_files = [f for f in media_list if f.endswith('.mp4')]
+    mp4_files = [f for f in media_list if f.endswith(".mp4")]
     if mp4_files:
         try:
-            with open(mp4_files[0], 'rb') as f:
+            with open(mp4_files[0], "rb") as f:
                 video_data = f.read()
-            
+
             blob_response = bluesky_client.com.atproto.repo.upload_blob(video_data)
             alt_text = f"Video animation for {identifier_for_alt_text}"
-            
+
             # Create video embed
             video_blob = atproto_models.AppBskyEmbedVideo.Main(
-                video=blob_response.blob,
-                alt=alt_text
+                video=blob_response.blob, alt=alt_text
             )
             return [video_blob]
         except Exception as e:
             logger.error(f"Failed to upload video, falling back to images: {e}")
             # Continue to image upload fallback
-    
+
     # Fallback: Upload up to 4 static images
     for image_path in sorted(media_list)[:4]:
-        if image_path.endswith('.mp4'):
+        if image_path.endswith(".mp4"):
             continue  # Skip mp4 files in image processing
         try:
             with open(image_path, "rb") as f:
                 img_data = f.read()
-            
-            alt_text = f"Image for {identifier_for_alt_text}: {os.path.basename(image_path)}"
+
+            alt_text = (
+                f"Image for {identifier_for_alt_text}: {os.path.basename(image_path)}"
+            )
             # Truncate alt text if too long
             max_alt_text_len = 500
             if len(alt_text) > max_alt_text_len:
-                alt_text = alt_text[:max_alt_text_len-3] + "..."
+                alt_text = alt_text[: max_alt_text_len - 3] + "..."
 
             response = bluesky_client.com.atproto.repo.upload_blob(img_data)
             image_blobs.append(
                 atproto_models.AppBskyEmbedImages.Image(
-                    image=response.blob,
-                    alt=alt_text
+                    image=response.blob, alt=alt_text
                 )
             )
             logger.info(f"BlueSky: Uploaded {image_path}")
@@ -1693,9 +1693,11 @@ def main():
                             bluesky_image_blobs = bluesky_upload_media(
                                 bluesky_client, media_list_for_bluesky, identifier
                             )
-                    
+
                     if not bluesky_image_blobs:
-                        logger.info("BlueSky: Video upload failed or produced no blobs, falling back to static images")
+                        logger.info(
+                            "BlueSky: Video upload failed or produced no blobs, falling back to static images"
+                        )
                         # Process images as static PNGs
                         image_list_for_bluesky = process_images(
                             outdir, downloaded_image_list, post_gif=False
@@ -1727,7 +1729,9 @@ def main():
             # use only for PAS/CONF notes:
             if prelim_result:
                 conf_hashtags = " ".join(
-                    filter(None, (conf.is_now(post["published"]) for conf in CONFERENCES))
+                    filter(
+                        None, (conf.is_now(post["published"]) for conf in CONFERENCES)
+                    )
                 )
                 logger.info(f"Conference hashtags: {conf_hashtags}")
 
@@ -1743,9 +1747,9 @@ def main():
                 # but the submission happens days before the analysis appears on arXiv
                 # while the CDS entry with the arXiv identifier comes after the
                 # availability on arXiv, so let's give people a heads-up of what's coming.
-                if (experiment == "CMS" or experiment == "LHCb") and identifier.startswith(
-                    "CERN-EP"
-                ):
+                if (
+                    experiment == "CMS" or experiment == "LHCb"
+                ) and identifier.startswith("CERN-EP"):
                     type_hashtag += " soon on arXiv"
 
             title_formatted = format_title(title)
@@ -1846,7 +1850,6 @@ def main():
                                     actual_post_gif_for_mastodon,
                                 )
                                 mastodon_image_ids = mastodon_upload_images(
-                                   (
                                     mastodon_client,
                                     image_list_for_mastodon,
                                     actual_post_gif_for_mastodon,
@@ -1856,48 +1859,54 @@ def main():
                             ) as e:  # Changed from MastodonAPIError to MastodonError
                                 logger.warning(
                                     f"Mastodon: Media upload attempt 1 failed: {e}"
-                            )
-                            # Check if it's the specific API error we want to handle for GIF fallback
-                            if (
-                                actual_post_gif_for_mastodon
-                                and isinstance(e, mastodon.MastodonAPIError)
-                                and hasattr(e, "http_status")
-                                and e.http_status == 422
-                            ):
-                                logger.info(
-                                    "Mastodon: GIF upload failed with 422 (MastodonAPIError). Retrying media upload without GIF."
                                 )
-                                actual_post_gif_for_mastodon = False  # Fallback: No GIF
-                                try:
-                                    # Attempt 2: Process and upload as individual images
+                                # Check if it's the specific API error we want to handle for GIF fallback
+                                if (
+                                    actual_post_gif_for_mastodon
+                                    and isinstance(e, mastodon.MastodonAPIError)
+                                    and hasattr(e, "http_status")
+                                    and e.http_status == 422
+                                ):
                                     logger.info(
-                                        f"Mastodon: Fallback media processing (post_gif={actual_post_gif_for_mastodon})."
+                                        "Mastodon: GIF upload failed with 422 (MastodonAPIError). Retrying media upload without GIF."
                                     )
-                                    image_list_for_mastodon_fallback = process_images(
-                                        outdir, downloaded_image_list, post_gif=False
+                                    actual_post_gif_for_mastodon = (
+                                        False  # Fallback: No GIF
                                     )
-                                    mastodon_image_ids = mastodon_upload_images(
-                                        mastodon_client,
-                                        image_list_for_mastodon_fallback,
-                                        post_gif=False,
-                                    )
-                                except mastodon.MastodonError as e2:
+                                    try:
+                                        # Attempt 2: Process and upload as individual images
+                                        logger.info(
+                                            f"Mastodon: Fallback media processing (post_gif={actual_post_gif_for_mastodon})."
+                                        )
+                                        image_list_for_mastodon_fallback = (
+                                            process_images(
+                                                outdir,
+                                                downloaded_image_list,
+                                                post_gif=False,
+                                            )
+                                        )
+                                        mastodon_image_ids = mastodon_upload_images(
+                                            mastodon_client,
+                                            image_list_for_mastodon_fallback,
+                                            post_gif=False,
+                                        )
+                                    except mastodon.MastodonError as e2:
+                                        logger.error(
+                                            f"Mastodon: Media upload fallback attempt failed: {e2}"
+                                        )
+                                        mastodon_image_ids = []  # Failed to upload any media in fallback
+                                else:
+                                    # This is a MastodonError that is not the specific 422 GIF error,
+                                    # or it was a MastodonAPIError not fitting the criteria.
                                     logger.error(
-                                        f"Mastodon: Media upload fallback attempt failed: {e2}"
+                                        f"Mastodon: Unhandled MastodonError or non-422 API error during media upload: {e}"
                                     )
-                                    mastodon_image_ids = []  # Failed to upload any media in fallback
-                            else:
-                                # This is a MastodonError that is not the specific 422 GIF error,
-                                # or it was a MastodonAPIError not fitting the criteria.
-                                logger.error(
-                                    f"Mastodon: Unhandled MastodonError or non-422 API error during media upload: {e}"
-                                )
-                                mastodon_image_ids = []  # Failed to upload any media
+                                    mastodon_image_ids = []  # Failed to upload any media
                             except Exception as e_generic:  # Catch other potential errors (e.g., from process_images)
                                 logger.error(
                                     f"Mastodon: Unexpected error during media preparation: {e_generic}"
-                            )
-                            mastodon_image_ids = []  # Failed to prepare/upload any media
+                                )
+                                mastodon_image_ids = []  # Failed to prepare/upload any media
 
                     # Proceed with tooting attempts
                     toot_response = None
