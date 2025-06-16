@@ -1,34 +1,36 @@
 """Twitter bot to post latest CMS results."""
 
 from __future__ import print_function
-import os
-import sys
+
 import argparse
-import shutil
-import logging
-import subprocess
-import re
 import configparser
+import logging
+import os
+import re
+import shutil
+import subprocess
+import sys
+import time
+import zipfile
 from io import BytesIO
 from pathlib import Path
-import zipfile
+
 import daiquiri
 import feedparser
 import lxml.html as lh
-from pylatexenc.latexwalker import LatexWalkerError
-from pylatexenc.latex2text import LatexNodes2Text
-import tweepy
 import mastodon
 import maya
 import requests
-import time
-from wand.image import Image, Color
-from wand.exceptions import CorruptImageError  # pylint: disable=no-name-in-module
+import tweepy
 
 # Assuming atproto is installed
 from atproto import Client as BlueskyClient
 from atproto import models as atproto_models
 from atproto.exceptions import AtProtocolError as BlueskyAtpApiError
+from pylatexenc.latex2text import LatexNodes2Text
+from pylatexenc.latexwalker import LatexWalkerError
+from wand.exceptions import CorruptImageError  # pylint: disable=no-name-in-module
+from wand.image import Color, Image
 
 # Maximum image dimension (both x and y)
 MAX_IMG_DIM = 1000  # could be 1280
@@ -1672,7 +1674,7 @@ def main():
                         and e.http_status == 422
                     ):
                         logger.info(
-                            f"Mastodon: Specific MastodonAPIError (422) for GIF detected. Retrying without GIF."
+                            "Mastodon: Specific MastodonAPIError (422) for GIF detected. Retrying without GIF."
                         )
                         current_post_gif_for_mastodon = False  # Fallback: No GIF
                         try:
@@ -1728,7 +1730,7 @@ def main():
                 try:
                     logger.info("BlueSky: Processing images for video conversion")
                     gif_list = process_images(
-                        outdir, downloaded_image_list, post_gif=True
+                        outdir, downloaded_image_list, post_gif=True, platform="bluesky"
                     )
                     if gif_list and len(gif_list) > 0:
                         # Convert the GIF to MP4
