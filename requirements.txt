@@ -1,7 +1,7 @@
 atproto==0.0.61
 daiquiri==3.2.1
 feedparser==6.0.10
-lxml==4.9.3
+lxml==6.1.0
 Mastodon.py==1.8.1
 maya==0.6.1
 pylatexenc==2.10
