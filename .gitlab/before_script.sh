@@ -1,8 +1,7 @@
 #!/bin/bash
 # exit when any command fails
 set -e
-# echo off
-set -x
+set +x
 # Create the config
 rm -f auth.ini
 echo "[${EXPERIMENT}]" > auth.ini
@@ -37,13 +36,11 @@ fi
 mkdir -p ~/.ssh
 chmod 700 ~/.ssh
 eval "$(ssh-agent -s)"
-set -x
-ssh-add <(echo "$GIT_SSH_PRIV_KEY")
-echo "$GIT_SSH_PRIV_KEY" > ~/.ssh/id_rsa
+ssh-add <(printf "%s\n" "$GIT_SSH_PRIV_KEY")
+printf "%s\n" "$GIT_SSH_PRIV_KEY" > ~/.ssh/id_rsa
 set +x
 chmod 600 ~/.ssh/id_rsa
 ssh-keyscan -p 7999 gitlab.cern.ch > ~/.ssh/known_hosts
-set -x
 # # Set git user name and email
 git config --global user.email "${GITMAIL}"
 git config --global user.name "${GITNAME}"
