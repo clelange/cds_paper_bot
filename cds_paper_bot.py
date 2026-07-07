@@ -124,6 +124,10 @@ CONFERENCES.append(
 daiquiri.setup(level=logging.INFO)
 logger = daiquiri.getLogger()  # pylint: disable=invalid-name
 
+REQUEST_TIMEOUT = float(os.getenv("CDS_REQUEST_TIMEOUT", "10"))
+REQUEST_RETRIES = int(os.getenv("CDS_REQUEST_RETRIES", "3"))
+REQUEST_RETRY_DELAY = float(os.getenv("CDS_REQUEST_RETRY_DELAY", "2"))
+
 
 def get_twitter_conn_v1(
     api_key, api_secret, access_token, access_token_secret
@@ -153,12 +157,150 @@ def get_twitter_conn_v2(
     return client
 
 
-def read_feed(rss_url):
-    """read the RSS feed and return dictionary"""
+def _request_context(phase, experiment=None, feed_id=None, identifier=None):
+    """Format request context for logs."""
+    context = [f"phase={phase}"]
+    if experiment:
+        context.append(f"experiment={experiment}")
+    if feed_id:
+        context.append(f"feed_id={feed_id}")
+    if identifier:
+        context.append(f"identifier={identifier}")
+    return ", ".join(context)
+
+
+def request_with_retries(
+    url,
+    phase,
+    experiment=None,
+    feed_id=None,
+    identifier=None,
+    stream=False,
+    timeout=REQUEST_TIMEOUT,
+    retries=REQUEST_RETRIES,
+    retry_delay=REQUEST_RETRY_DELAY,
+):
+    """Request a URL with short retries for transient network failures."""
+    context = _request_context(phase, experiment, feed_id, identifier)
+    for attempt in range(1, retries + 1):
+        try:
+            return requests.get(url, timeout=timeout, stream=stream)
+        except (requests.Timeout, requests.ConnectionError) as request_exception:
+            logger.warning(
+                "Transient request failure (%s, attempt=%d/%d, url=%s): %s: %s",
+                context,
+                attempt,
+                retries,
+                url,
+                request_exception.__class__.__name__,
+                request_exception,
+            )
+            if attempt < retries:
+                time.sleep(retry_delay)
+        except requests.RequestException as request_exception:
+            logger.warning(
+                "Request failed (%s, url=%s): %s: %s",
+                context,
+                url,
+                request_exception.__class__.__name__,
+                request_exception,
+            )
+            return None
+
+    logger.warning("Giving up request (%s, attempts=%d, url=%s)", context, retries, url)
+    return None
+
+
+def media_url_exists(
+    media_url,
+    experiment=None,
+    feed_id=None,
+    identifier=None,
+    timeout=REQUEST_TIMEOUT,
+    retries=REQUEST_RETRIES,
+    retry_delay=REQUEST_RETRY_DELAY,
+):
+    """Check whether a media URL can be reached without failing the bot run."""
+    request = request_with_retries(
+        media_url,
+        phase="media check",
+        experiment=experiment,
+        feed_id=feed_id,
+        identifier=identifier,
+        timeout=timeout,
+        retries=retries,
+        retry_delay=retry_delay,
+    )
+    if request is None:
+        logger.warning("Skipping media after failed check: %s", media_url)
+        return False
+    if request.status_code >= 400:
+        logger.error("media: " + media_url + " does not exist!")
+        return False
+    return True
+
+
+def download_media_url(
+    media_url,
+    out_path,
+    experiment=None,
+    feed_id=None,
+    identifier=None,
+    timeout=REQUEST_TIMEOUT,
+    retries=REQUEST_RETRIES,
+    retry_delay=REQUEST_RETRY_DELAY,
+):
+    """Download media and remove partial files on streaming failures."""
+    request = request_with_retries(
+        media_url,
+        phase="media download",
+        experiment=experiment,
+        feed_id=feed_id,
+        identifier=identifier,
+        stream=True,
+        timeout=timeout,
+        retries=retries,
+        retry_delay=retry_delay,
+    )
+    if request is None:
+        logger.warning("Skipping media after failed download: %s", media_url)
+        return False
+    if request.status_code != 200:
+        logger.warning(
+            "Skipping media download with status %s: %s", request.status_code, media_url
+        )
+        return False
+
     try:
-        response = requests.get(rss_url, timeout=10)
-    except requests.ReadTimeout:
-        logger.error("Timeout when reading RSS %s", rss_url)
+        with open(out_path, "wb") as file_handler:
+            request.raw.decode_content = True
+            shutil.copyfileobj(request.raw, file_handler)
+    except Exception as download_exception:  # pylint: disable=broad-except
+        logger.warning(
+            "Failed while streaming media download (%s, url=%s): %s: %s",
+            _request_context(
+                "media download", experiment, feed_id=feed_id, identifier=identifier
+            ),
+            media_url,
+            download_exception.__class__.__name__,
+            download_exception,
+        )
+        if os.path.exists(out_path):
+            os.remove(out_path)
+        return False
+
+    return True
+
+
+def read_feed(rss_url, feed_id=None, experiment=None):
+    """read the RSS feed and return dictionary"""
+    response = request_with_retries(
+        rss_url,
+        phase="RSS",
+        experiment=experiment,
+        feed_id=feed_id,
+    )
+    if response is None:
         return
     # Turn stream into memory stream object for universal feedparser
     content = BytesIO(response.content)
@@ -167,12 +309,16 @@ def read_feed(rss_url):
     return feed
 
 
-def read_html(html_url):
+def read_html(html_url, experiment=None, feed_id=None, identifier=None):
     """read the HTML page and return dictionary"""
-    try:
-        response = requests.get(html_url, timeout=10)
-    except requests.ReadTimeout:
-        logger.error("Timeout when reading HTML %s", html_url)
+    response = request_with_retries(
+        html_url,
+        phase="HTML",
+        experiment=experiment,
+        feed_id=feed_id,
+        identifier=identifier,
+    )
+    if response is None:
         return
     # Turn stream into memory stream object for universal feedparser
     content = BytesIO(response.content)
@@ -1364,7 +1510,9 @@ def main():
     feed_entries = []
     for key in config["FEED_DICT"]:
         logger.info(f"Getting feed for {key}")
-        this_feed = read_feed(config["FEED_DICT"][key])
+        this_feed = read_feed(
+            config["FEED_DICT"][key], feed_id=key, experiment=experiment
+        )
         if this_feed:
             this_feed_entries = this_feed["entries"]
             logger.info("Found %d items" % len(this_feed_entries))
@@ -1474,8 +1622,13 @@ def main():
             logger.info("Found arXiv ID arXiv:%s" % arxiv_id)
             arxiv_link = "https://arxiv.org/abs/%s" % arxiv_id
             logger.debug(arxiv_link)
-            request = requests.get(arxiv_link)
-            if request.status_code >= 400:
+            request = request_with_retries(
+                arxiv_link,
+                phase="arXiv validation",
+                experiment=experiment,
+                identifier=identifier,
+            )
+            if request is None or request.status_code >= 400:
                 logger.warning(f"arXiv URL {arxiv_link} seems invalid")
                 arxiv_link = None
 
@@ -1526,19 +1679,24 @@ def main():
             if media_found:
                 media_url = media_url.split("?", 1)[0]
                 logger.debug("media: " + media_url)
-                request = requests.get(media_url, timeout=10)
-                if not request.status_code < 400:
-                    logger.error("media: " + media_url + " does not exist!")
+                if not media_url_exists(
+                    media_url,
+                    experiment=experiment,
+                    feed_id=post["feed_id"],
+                    identifier=identifier,
+                ):
                     media_found = False
             # download and categorise media
             if media_found:
                 # download images
                 out_path = "{}/{}".format(outdir, media_url.rsplit("/", 1)[1])
-                request = requests.get(media_url, stream=True)
-                if request.status_code == 200:
-                    with open(out_path, "wb") as file_handler:
-                        request.raw.decode_content = True
-                        shutil.copyfileobj(request.raw, file_handler)
+                if download_media_url(
+                    media_url,
+                    out_path,
+                    experiment=experiment,
+                    feed_id=post["feed_id"],
+                    identifier=identifier,
+                ):
                     if out_path.find("%") >= 0:
                         continue
                     if media_isimage:
@@ -1558,7 +1716,15 @@ def main():
                 + identifier
                 + "/"
             )
-            linkedimages = read_html(confnotepageurl).xpath("//a[img]/@href")
+            confnote_html = read_html(
+                confnotepageurl,
+                experiment=experiment,
+                feed_id=post["feed_id"],
+                identifier=identifier,
+            )
+            linkedimages = []
+            if confnote_html is not None:
+                linkedimages = confnote_html.xpath("//a[img]/@href")
             for image in linkedimages:
                 # ATLAS only uses PNG format for plots
                 if not image.lower().endswith(".png"):
@@ -1570,19 +1736,24 @@ def main():
                 media_found = True
                 media_url = confnotepageurl + image
                 logger.debug("media: " + media_url)
-                request = requests.get(media_url, timeout=10)
-                if not request.status_code < 400:
-                    logger.error("media: " + media_url + " does not exist!")
+                if not media_url_exists(
+                    media_url,
+                    experiment=experiment,
+                    feed_id=post["feed_id"],
+                    identifier=identifier,
+                ):
                     media_found = False
 
                 if media_found:
                     # download images
                     out_path = "{}/{}".format(outdir, media_url.rsplit("/", 1)[1])
-                    request = requests.get(media_url, stream=True)
-                    if request.status_code == 200:
-                        with open(out_path, "wb") as file_handler:
-                            request.raw.decode_content = True
-                            shutil.copyfileobj(request.raw, file_handler)
+                    if download_media_url(
+                        media_url,
+                        out_path,
+                        experiment=experiment,
+                        feed_id=post["feed_id"],
+                        identifier=identifier,
+                    ):
                         if out_path.find("%") >= 0:
                             continue
                         downloaded_image_list.append(out_path)
