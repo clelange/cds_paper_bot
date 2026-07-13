@@ -1,6 +1,6 @@
 # Deploying the bot to GitLab CI/CD
 
-## Twitter credentials
+## Platform credentials
 
 Go to the [Twitter Developers](https://developer.twitter.com/apps) website and choose "Create an app". This might ask you to apply for a Twitter developer account first.
 
@@ -33,7 +33,9 @@ Once this is done, go to "CI / CD" (not the one under "Settings") -> "Pipelines"
 
 ## Setting up the bot
 
-Each bot/account will need some specific settings, and the following steps will set things up such that the bot will run on a regular schedule. Go to "CI / CD" (not the one under "Settings") -> "Schedules" and create a new schedule. To run once per hour at 15 minutes past use `15 * * * *`. Choose a name and an "Interval pattern". Mind that the bot cannot run more than once per hour due to the way GitLab cron scheduling works.
+Each experiment/account needs one schedule. Go to "CI / CD" (not the one under "Settings") -> "Schedules" and create it with an interval such as `*/30 * * * *`. The CMS schedule should contain both the Mastodon and Bluesky credentials so one invocation prepares the media once and delivers it to both services. Remove older per-feed or per-platform CMS schedules after the consolidated schedule has been verified.
+
+The scheduled job uses a [GitLab resource group](https://docs.gitlab.com/ci/resource_groups/) named for the experiment. This serializes publishers for the same experiment. It also updates the checkout before running, writes successful platform deliveries independently to `delivery-ledger/<EXPERIMENT>.json`, and uploads `run-summary.json` as a job artifact. Public-account preflight checks recover a post if the previous process published it but stopped before saving the ledger.
 
 Now add a couple of variables, see [feeds.ini](https://github.com/clelange/cds_paper_bot/blob/master/feeds.ini) for a list of experiments already predefined:
 
@@ -45,7 +47,9 @@ Now add a couple of variables, see [feeds.ini](https://github.com/clelange/cds_p
 | `CONSUMER_SECRET`       | The Twitter "Consumer API secret key" generated above        |
 | `ACCESS_TOKEN`          | The Twitter "Access token" generated above                   |
 | `ACCESS_TOKEN_SECRET`   | The Twitter "Access token secret" generated above            |
-| `MASTODON_BOT_HANDLE`   | Your Mastodon account handle, e.g. `@cmspapers@botsin.space` |
+| `MASTODON_BOT_HANDLE`   | Full Mastodon account handle, e.g. `@cmspapers@mastodon.social` |
 | `MASTODON_ACCESS_TOKEN` | Mastodon app "Access token"                                  |
+| `BLUESKY_HANDLE`        | Bluesky account handle, e.g. `cmspapers.bsky.social`          |
+| `BLUESKY_APP_PASSWORD`  | Bluesky app password (not the account password)               |
 
-You can either set both Twitter/X and Mastodon values or only one of them.
+Only configured platforms are used. For the current CMS deployment, configure Mastodon and Bluesky together; Twitter/X credentials can be omitted.

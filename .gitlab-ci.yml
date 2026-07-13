@@ -8,11 +8,24 @@ job:on-schedule:
   only:
     - schedules
   image: $CI_REGISTRY_IMAGE
+  resource_group: cds-paper-bot-${EXPERIMENT}
+  interruptible: false
+  timeout: 20 minutes
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
   before_script:
     - ls -lisa
     - ./.gitlab/before_script.sh
   script:
     - ./.gitlab/script.sh
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths:
+      - run-summary.json
 
 update_repo:
   stage: update

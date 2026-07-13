@@ -4,7 +4,9 @@
 
 This is a bot written in python (version 3) that reads the RSS feeds of the [CERN Document Server (CDS)](https://cds.cern.ch/) and creates tweets/toots/skeets of new publications.
 
-It currently works pretty well for the ATLAS and CMS feeds listed in [`feeds.ini`](../blob/master/feeds.ini), and without images also for LHCb and ALICE.
+Posts are generated deterministically, without an LLM or public-results metadata. CERN-EP heads-up posts and later arXiv announcements remain separate. The first media frame is an offline branded cover for CMS, LHCb, and ALICE; ATLAS uses the source document's title page when it can be rendered and otherwise falls back to its branded cover. Mastodon receives one GIF and Bluesky receives an MP4 converted from that same animation. Scientific frames are not branded or annotated.
+
+It supports the ATLAS, CMS, LHCb, and ALICE feeds listed in [`feeds.ini`](../blob/master/feeds.ini), with a logo-free fallback for other experiments.
 
 Follow the bots on X:
 
@@ -60,6 +62,10 @@ For information on running the bot, do
 ```shell
 python cds_paper_bot.py --help
 ```
+
+`--cover-mode auto` is the default; use `--cover-mode none` to retain the old plot-only sequence. `--figmax` still limits the number of scientific figures. Delivery state is stored per experiment in `delivery-ledger/`, with Mastodon, Bluesky, and optional Twitter/X success recorded independently. The older `*_FEED.txt` files are imported automatically but are no longer updated.
+
+Logo files and their sources are documented in [`img/logos/README.md`](img/logos/README.md). They are bundled with the image and are never fetched at runtime.
 
 Note: if this doesn't work on MacOS, make sure to `brew install freetype imagemagick`
 and `export MAGICK_HOME=/opt/homebrew/opt/imagemagick`.

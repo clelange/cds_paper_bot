@@ -4,6 +4,7 @@ feedparser==6.0.10
 lxml==6.1.0
 Mastodon.py==1.8.1
 maya==0.6.1
+Pillow==12.3.0
 pylatexenc==2.10
 requests==2.33.0
 tweepy==4.14.0
