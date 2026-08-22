@@ -1,7 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 set +x
-git checkout master
+git fetch origin master
+git checkout -B master origin/master
 git remote add upstream https://github.com/clelange/cds_paper_bot.git
 git fetch upstream
 if [[ -n $(git log ..upstream/master) ]]; then
@@ -15,7 +16,9 @@ if [[ -n $(git log ..upstream/master) ]]; then
     git config --global user.name "${GITNAME}"
     git merge upstream/master -m "merge with upstream"
     git remote set-url origin "${REMOTE_GIT_REPO}"
-    git push origin HEAD
+    # The push pipeline builds the commit that was just synchronized. Building in
+    # this web pipeline would use its older, immutable CI_COMMIT_SHA checkout.
+    git push -o ci.variable="BUILD_IMAGE=true" origin HEAD:master
 else
     echo "No changes found."
 fi

@@ -169,7 +169,6 @@ def _plain_text(html: str) -> str:
 def find_existing_mastodon_post(
     handle: str,
     identifier: str,
-    link: str,
     expected_text_hash: str = "",
     timeout: float = 10,
 ) -> tuple[str, str] | None:
@@ -196,10 +195,8 @@ def find_existing_mastodon_post(
         for status in statuses_response.json():
             content = _plain_text(status.get("content", ""))
             content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
-            if (
-                identifier in content
-                or (link and link in content)
-                or (expected_text_hash and content_hash == expected_text_hash)
+            if identifier in content or (
+                expected_text_hash and content_hash == expected_text_hash
             ):
                 return str(status.get("id", "")), str(status.get("url", ""))
     except (requests.RequestException, KeyError, TypeError, ValueError):
@@ -210,7 +207,6 @@ def find_existing_mastodon_post(
 def find_existing_bluesky_post(
     handle: str,
     identifier: str,
-    link: str,
     expected_text_hash: str = "",
     timeout: float = 10,
 ) -> tuple[str, str] | None:
@@ -226,10 +222,8 @@ def find_existing_bluesky_post(
             post = item.get("post", {})
             text = post.get("record", {}).get("text", "")
             content_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
-            if (
-                identifier in text
-                or (link and link in text)
-                or (expected_text_hash and content_hash == expected_text_hash)
+            if identifier in text or (
+                expected_text_hash and content_hash == expected_text_hash
             ):
                 uri = str(post.get("uri", ""))
                 post_id = uri.rsplit("/", 1)[-1]

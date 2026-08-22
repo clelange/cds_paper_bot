@@ -76,7 +76,6 @@ def test_crash_after_publish_is_recovered_from_public_accounts(monkeypatch):
     assert find_existing_mastodon_post(
         "@cmspapers@mastodon.social",
         publication().identifier,
-        publication().link,
     ) == ("42", "https://mastodon.social/@cmspapers/42")
 
     monkeypatch.setattr(
@@ -97,10 +96,62 @@ def test_crash_after_publish_is_recovered_from_public_accounts(monkeypatch):
     assert find_existing_bluesky_post(
         "cmspapers.bsky.social",
         publication().identifier,
-        publication().link,
     ) == (
         "at://did/app.bsky.feed.post/abc",
         "https://bsky.app/profile/cmspapers.bsky.social/post/abc",
+    )
+
+
+def test_recovery_does_not_conflate_lifecycle_posts_sharing_a_link(monkeypatch):
+    shared_link = publication().link
+    old_identifier = "CERN-EP-2026-001"
+    new_identifier = "arXiv:2608.00001"
+    responses = iter(
+        [
+            FakeResponse({"id": "account"}),
+            FakeResponse(
+                [
+                    {
+                        "id": "42",
+                        "url": "https://mastodon.social/@cmspapers/42",
+                        "content": f"{old_identifier} {shared_link}",
+                    }
+                ]
+            ),
+        ]
+    )
+    monkeypatch.setattr(
+        "paperbot.state.requests.get", lambda *args, **kwargs: next(responses)
+    )
+    assert (
+        find_existing_mastodon_post(
+            "@cmspapers@mastodon.social",
+            new_identifier,
+        )
+        is None
+    )
+
+    monkeypatch.setattr(
+        "paperbot.state.requests.get",
+        lambda *args, **kwargs: FakeResponse(
+            {
+                "feed": [
+                    {
+                        "post": {
+                            "uri": "at://did/app.bsky.feed.post/old",
+                            "record": {"text": f"{old_identifier} {shared_link}"},
+                        }
+                    }
+                ]
+            }
+        ),
+    )
+    assert (
+        find_existing_bluesky_post(
+            "cmspapers.bsky.social",
+            new_identifier,
+        )
+        is None
     )
 
 
@@ -108,7 +159,13 @@ def test_gitlab_serializes_publishers_and_refreshes_state_before_posting():
     root = Path(__file__).resolve().parents[1]
     pipeline = (root / ".gitlab-ci.yml").read_text(encoding="utf-8")
     script = (root / ".gitlab" / "script.sh").read_text(encoding="utf-8")
-    assert "resource_group: cds-paper-bot-${EXPERIMENT}" in pipeline
+    update_script = (root / ".gitlab" / "update_repo.sh").read_text(encoding="utf-8")
+    assert pipeline.count("resource_group: cds-paper-bot-repository-writer") == 2
+    assert "if: '$BUILD_IMAGE == \"true\"'" in pipeline
+    assert 'ci.variable="BUILD_IMAGE=true"' in update_script
+    assert update_script.index(
+        "git checkout -B master origin/master"
+    ) < update_script.index("git merge upstream/master")
     assert script.index("git checkout -B master origin/master") < script.index(
         "python cds_paper_bot.py"
     )

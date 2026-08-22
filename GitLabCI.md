@@ -29,13 +29,17 @@ Once created, go to your newly-created project, choose "Settings" -> "CI / CD" a
 | `GIT_SSH_PRIV_KEY` | Content of `cern-gitlab-ci`                                                                              |
 | `REMOTE_GIT_REPO`  | URL for cloning your repository via ssh, e.g. `ssh://git@gitlab.cern.ch:7999/username/cds_paper_bot.git` |
 
-Once this is done, go to "CI / CD" (not the one under "Settings") -> "Pipelines", click on "Run Pipeline" and then "Create pipeline". This will update your clone of the repository from the one on [Github](https://github.com/clelange/cds_paper_bot) and build a new docker container. Whenever there are changes in this repository that you would like to profit from as well, repeat this step.
+Once this is done, go to "CI / CD" (not the one under "Settings") -> "Pipelines", click on "Run Pipeline" and then "Create pipeline". This synchronizes the GitLab clone from [GitHub](https://github.com/clelange/cds_paper_bot). The synchronization push starts a second pipeline with `BUILD_IMAGE=true`; that pipeline builds the container from the newly pushed commit rather than the older commit that started the synchronization job. Whenever there are upstream changes, repeat this step and verify that the follow-up image-build pipeline succeeds.
+
+To rebuild the image without synchronizing new source, run a pipeline manually with the variable `BUILD_IMAGE=true`. This skips the repository-update job and builds the current GitLab `master` commit.
+
+When adopting this two-pipeline workflow for the first time, the synchronization pipeline itself still uses the previous GitLab CI configuration. After that first synchronization finishes, run one additional pipeline with `BUILD_IMAGE=true` to bootstrap an image from the newly synchronized commit. Later synchronizations start the follow-up build automatically.
 
 ## Setting up the bot
 
 Each experiment/account needs one schedule. Go to "CI / CD" (not the one under "Settings") -> "Schedules" and create it with an interval such as `*/30 * * * *`. The CMS schedule should contain both the Mastodon and Bluesky credentials so one invocation prepares the media once and delivers it to both services. Remove older per-feed or per-platform CMS schedules after the consolidated schedule has been verified.
 
-The scheduled job uses a [GitLab resource group](https://docs.gitlab.com/ci/resource_groups/) named for the experiment. This serializes publishers for the same experiment. It also updates the checkout before running, writes successful platform deliveries independently to `delivery-ledger/<EXPERIMENT>.json`, and uploads `run-summary.json` as a job artifact. Public-account preflight checks recover a post if the previous process published it but stopped before saving the ledger.
+Scheduled jobs and repository synchronization use one shared [GitLab resource group](https://docs.gitlab.com/ci/resource_groups/). This serializes every job that can push to the GitLab `master` branch, including publishers for different experiments. A scheduled job also updates its checkout before running, writes successful platform deliveries independently to `delivery-ledger/<EXPERIMENT>.json`, and uploads `run-summary.json` as a job artifact. Public-account preflight checks recover a post if the previous process published it but stopped before saving the ledger; recovery requires the lifecycle identifier or an exact deterministic root-post hash, so two lifecycle posts that share a CDS link remain distinct.
 
 Now add a couple of variables, see [feeds.ini](https://github.com/clelange/cds_paper_bot/blob/master/feeds.ini) for a list of experiments already predefined:
 

@@ -710,10 +710,9 @@ def bluesky_upload_media(
             logger.error(f"Failed to upload video, falling back to images: {e}")
             # Continue to image upload fallback
 
-    # Fallback: Upload up to 4 static images
-    for image_path in sorted(media_list)[:4]:
-        if image_path.endswith(".mp4"):
-            continue  # Skip mp4 files in image processing
+    # Fallback: Upload up to 4 static images supplied alongside the preferred video.
+    image_files = [path for path in media_list if not path.endswith(".mp4")]
+    for image_path in sorted(image_files)[:4]:
         try:
             with open(image_path, "rb") as f:
                 img_data = f.read()
@@ -1276,14 +1275,12 @@ def _adopt_remote_delivery(publication, platform, config, ledger, run_summary):
         existing = find_existing_mastodon_post(
             config["AUTH"].get("MASTODON_BOT_HANDLE", ""),
             publication.identifier,
-            publication.link,
             expected_text_hash=expected_text_hash,
         )
     else:
         existing = find_existing_bluesky_post(
             config["AUTH"].get("BLUESKY_HANDLE", ""),
             publication.identifier,
-            publication.link,
             expected_text_hash=expected_text_hash,
         )
     if not existing:
@@ -1456,6 +1453,23 @@ def main():
         bluesky_media = []
         mastodon_uses_gif = bool(media.gif_path)
         twitter_uses_gif = bool(media.gif_path)
+
+        def record_media_failure(platform, reason):
+            logger.error("%s media delivery failed: %s", platform.title(), reason)
+            run_summary.add(
+                "media_failed",
+                platform=platform,
+                identifier=identifier,
+                reason=reason,
+            )
+            run_summary.add(
+                "failed",
+                platform=platform,
+                identifier=identifier,
+                reason="media_upload",
+            )
+            deliver[platform] = False
+
         if not args.dry:
             if deliver["twitter"]:
                 paths = [media.gif_path] if media.gif_path else list(media.static_paths)
@@ -1468,6 +1482,21 @@ def main():
                         )
                     except Exception as exception:  # pylint: disable=broad-except
                         logger.error("Twitter media upload failed: %s", exception)
+                        if media.gif_path and media.static_paths:
+                            twitter_uses_gif = False
+                            try:
+                                twitter_media_ids = twitter_upload_images(
+                                    twitter_client["v1"],
+                                    [str(path) for path in media.static_paths],
+                                    False,
+                                )
+                            except Exception as fallback_exception:  # pylint: disable=broad-except
+                                logger.error(
+                                    "Twitter static media fallback failed: %s",
+                                    fallback_exception,
+                                )
+                    if not twitter_media_ids:
+                        record_media_failure("twitter", "no uploaded media")
             if deliver["mastodon"]:
                 paths = [media.gif_path] if media.gif_path else list(media.static_paths)
                 if paths:
@@ -1478,16 +1507,28 @@ def main():
                             mastodon_uses_gif,
                             alt_text=media.alt_text,
                         )
-                    except mastodon.MastodonError as exception:
+                    except Exception as exception:  # pylint: disable=broad-except
                         logger.error("Mastodon media upload failed: %s", exception)
-                        run_summary.add(
-                            "media_failed",
-                            platform="mastodon",
-                            identifier=identifier,
-                            reason=exception,
-                        )
+                        if media.gif_path and media.static_paths:
+                            mastodon_uses_gif = False
+                            try:
+                                mastodon_media_ids = mastodon_upload_images(
+                                    mastodon_client,
+                                    [str(path) for path in media.static_paths],
+                                    False,
+                                    alt_text=media.alt_text,
+                                )
+                            except Exception as fallback_exception:  # pylint: disable=broad-except
+                                logger.error(
+                                    "Mastodon static media fallback failed: %s",
+                                    fallback_exception,
+                                )
+                    if not mastodon_media_ids:
+                        record_media_failure("mastodon", "no uploaded media")
             if deliver["bluesky"]:
-                paths = [media.mp4_path] if media.mp4_path else list(media.static_paths)
+                paths = ([media.mp4_path] if media.mp4_path else []) + list(
+                    media.static_paths
+                )
                 if paths:
                     bluesky_media = bluesky_upload_media(
                         bluesky_client,
@@ -1495,6 +1536,8 @@ def main():
                         identifier,
                         alt_text=media.alt_text,
                     )
+                    if not bluesky_media:
+                        record_media_failure("bluesky", "no uploaded media")
 
         if deliver["twitter"]:
             if args.dry:
