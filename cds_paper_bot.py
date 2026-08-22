@@ -3,17 +3,21 @@
 from __future__ import print_function
 
 import argparse
+import atexit
 import configparser
+import concurrent.futures
+import hashlib
+import json
 import logging
 import os
 import re
 import shutil
-import subprocess
 import sys
 import time
 import zipfile
 from io import BytesIO
 from pathlib import Path
+from urllib.parse import unquote, urlparse
 
 import daiquiri
 import feedparser
@@ -29,96 +33,14 @@ from atproto import models as atproto_models
 from atproto.exceptions import AtProtocolError as BlueskyAtpApiError
 from pylatexenc.latex2text import LatexNodes2Text
 from pylatexenc.latexwalker import LatexWalkerError
-from wand.exceptions import CorruptImageError  # pylint: disable=no-name-in-module
-from wand.image import Color, Image
 
-# Maximum image dimension (both x and y)
-MAX_IMG_DIM = 1000  # could be 1280
-MAX_IMG_DIM_AREA = 1280 * 720  # 1 megapixel
-MAX_IMG_SIZE = 5242880
-# TODO: tag actual experiment?
-# TODO: Make certain keywords tags
-# collection could be: Higgs, NewPhysics, 13TeV/8TeV, StandardModel,
-# resonances, DarkMatter, SUSY, BSM
-# Also: CMSB2G, CMSHIG, CMSEXO etc.
-# TopQuark, BottomQuark Quark/Quarks, Tau
-CADI_TO_HASHTAG = {}
-CADI_TO_HASHTAG["TOP"] = "#TopQuark"
-CADI_TO_HASHTAG["HIG"] = "#HiggsBoson"
-CADI_TO_HASHTAG["B2G"] = "#NewPhysics"
-CADI_TO_HASHTAG["EXO"] = "#NewPhysics"
-CADI_TO_HASHTAG["SUS"] = "#SuperSymmetry"
-CADI_TO_HASHTAG["FTR"] = "#Upgrade"
-CADI_TO_HASHTAG["SMP"] = "#StandardModel"
-CADI_TO_HASHTAG["BPH"] = "#BPhysics"
-CADI_TO_HASHTAG["JME"] = "#Jets"
-CADI_TO_HASHTAG["BTV"] = "#FlavourTagging"
-CADI_TO_HASHTAG["MUO"] = "#Muons"
-CADI_TO_HASHTAG["TAU"] = "#Taus #TauLeptons"
-CADI_TO_HASHTAG["EGM"] = "#Electrons #Photons"
-CADI_TO_HASHTAG["LUM"] = "#Luminosity"
-CADI_TO_HASHTAG["PRF"] = "#ParticleFlow"
-CADI_TO_HASHTAG["HIN"] = "#HeavyIons"
-
-# identifiers for preliminary results
-PRELIM = ["CMS-PAS", "ATLAS-CONF", "LHCb-CONF"]
-
-
-class Conference(object):
-    """Define conference class for hashtag implementation."""
-
-    __slots__ = ["name", "start", "end"]
-
-    def __init__(self, name, start, end):
-        """Initialise with conf name, start and end dates."""
-        self.name = name
-        self.start = start
-        self.end = end
-
-    def is_now(self, pub_date):
-        """Return conference name if publication date is within date range."""
-        if self.start <= maya.parse(pub_date) <= self.end:
-            # return f"#{self.name}{maya.now().year}"
-            return f"#{self.name}"
-        return ""
-
-
-CONFERENCES = []
-CONFERENCES.append(
-    Conference(
-        "Moriond",
-        maya.parse(f"{maya.now().year}-03-23"),
-        maya.parse(f"{maya.now().year}-04-11"),
-    )
-)
-CONFERENCES.append(
-    Conference(
-        "EPSHEP2023 EPSHEP23", maya.parse("2023-08-20"), maya.parse("2023-08-30")
-    )
-)
-CONFERENCES.append(
-    Conference("LeptonPhoton23", maya.parse("2023-07-16"), maya.parse("2023-07-26"))
-)
-CONFERENCES.append(
-    Conference("topq2023", maya.parse("2023-09-23"), maya.parse("2023-10-03"))
-)
-CONFERENCES.append(
-    Conference("HiggsCouplings", maya.parse("2019-09-29"), maya.parse("2019-10-06"))
-)
-CONFERENCES.append(
-    Conference("Higgs2023", maya.parse("2023-11-26"), maya.parse("2023-12-06"))
-)
-CONFERENCES.append(
-    Conference("QM2023", maya.parse("2023-09-01"), maya.parse("2023-09-11"))
-)
-CONFERENCES.append(
-    Conference("LHCP #LHCP2024", maya.parse("2024-06-01"), maya.parse("2024-06-10"))
-)
-CONFERENCES.append(
-    Conference("ICHEP2024", maya.parse("2024-07-16"), maya.parse("2024-07-26"))
-)
-CONFERENCES.append(
-    Conference("BOOST2024", maya.parse("2023-07-27"), maya.parse("2023-08-07"))
+from paperbot.media import natural_sort_key, order_media, prepare_media_sequence
+from paperbot.models import Publication, RunSummary, lifecycle_stage_for
+from paperbot.rendering import BlueskyRenderer, MastodonRenderer, render_messages
+from paperbot.state import (
+    DeliveryLedger,
+    find_existing_bluesky_post,
+    find_existing_mastodon_post,
 )
 
 daiquiri.setup(level=logging.INFO)
@@ -234,10 +156,15 @@ def media_url_exists(
     if request is None:
         logger.warning("Skipping media after failed check: %s", media_url)
         return False
-    if request.status_code >= 400:
-        logger.error("media: " + media_url + " does not exist!")
-        return False
-    return True
+    try:
+        if request.status_code >= 400:
+            logger.error("media: " + media_url + " does not exist!")
+            return False
+        return True
+    finally:
+        close_response = getattr(request, "close", None)
+        if close_response:
+            close_response()
 
 
 def download_media_url(
@@ -288,8 +215,119 @@ def download_media_url(
         if os.path.exists(out_path):
             os.remove(out_path)
         return False
+    finally:
+        close_response = getattr(request, "close", None)
+        if close_response:
+            close_response()
 
     return True
+
+
+def _media_filename(media_url, index):
+    """Return a filesystem-safe attachment name while retaining its extension."""
+    filename = Path(unquote(urlparse(media_url).path)).name
+    filename = re.sub(r"[^A-Za-z0-9._-]+", "_", filename).strip("._")
+    return filename or f"media-{index:03d}"
+
+
+def download_media_candidates(
+    candidates,
+    output_directory,
+    *,
+    experiment,
+    feed_id,
+    identifier,
+    workers=4,
+    time_budget=120,
+):
+    """Download each URL once with bounded concurrency and stable result order."""
+    output_directory = Path(output_directory)
+    output_directory.mkdir(parents=True, exist_ok=True)
+    unique_candidates = []
+    seen_urls = set()
+    seen_filenames = set()
+    for media_url, media_kind in candidates:
+        clean_url = media_url.split("?", 1)[0]
+        filename = _media_filename(clean_url, len(unique_candidates))
+        if clean_url in seen_urls or filename.casefold() in seen_filenames:
+            continue
+        seen_urls.add(clean_url)
+        seen_filenames.add(filename.casefold())
+        unique_candidates.append((clean_url, media_kind))
+
+    def download_one(index, media_url, media_kind):
+        output_path = output_directory / _media_filename(media_url, index)
+        if download_media_url(
+            media_url,
+            str(output_path),
+            experiment=experiment,
+            feed_id=feed_id,
+            identifier=identifier,
+        ):
+            return index, media_kind, output_path
+        return index, media_kind, None
+
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=max(1, workers))
+    futures = [
+        executor.submit(download_one, index, media_url, media_kind)
+        for index, (media_url, media_kind) in enumerate(unique_candidates)
+    ]
+    done, pending = concurrent.futures.wait(futures, timeout=time_budget)
+    for future in pending:
+        future.cancel()
+    executor.shutdown(wait=not pending, cancel_futures=True)
+    if pending:
+        logger.warning(
+            "Media download budget exhausted after %s seconds; cancelled %d item(s)",
+            time_budget,
+            len(pending),
+        )
+    results = []
+    for future in done:
+        try:
+            result = future.result()
+        except Exception as exception:  # pylint: disable=broad-except
+            logger.warning("Media download worker failed: %s", exception)
+            continue
+        if result[2] is not None:
+            results.append(result)
+    return [(kind, path) for _, kind, path in sorted(results)]
+
+
+def safe_extract_lhcb_figures(zip_path, output_directory, maximum_figures):
+    """Extract only bounded PDF figures from an LHCb attachment."""
+    output_directory = Path(output_directory)
+    output_directory.mkdir(parents=True, exist_ok=True)
+    extracted = []
+    with zipfile.ZipFile(zip_path) as archive:
+        candidates = sorted(
+            (
+                item
+                for item in archive.infolist()
+                if not item.is_dir()
+                and item.filename.casefold().endswith(".pdf")
+                and "lhcb-logo.pdf" not in item.filename.casefold()
+                and "__macosx" not in item.filename.casefold()
+                and not Path(item.filename).name.startswith(".")
+            ),
+            key=lambda item: natural_sort_key(item.filename),
+        )
+        for index, item in enumerate(candidates[:maximum_figures], start=1):
+            if item.file_size > 50 * 1024 * 1024:
+                logger.warning("Skipping oversized ZIP member %s", item.filename)
+                continue
+            destination = output_directory / f"{index:03d}-{Path(item.filename).name}"
+            with archive.open(item) as source, destination.open("wb") as target:
+                shutil.copyfileobj(source, target)
+            extracted.append(destination)
+    return extracted
+
+
+def response_value(response, key, default=""):
+    """Read an API response field from either a mapping or object."""
+    if isinstance(response, dict):
+        return response.get(key, default)
+    return getattr(response, key, default)
 
 
 def read_feed(rss_url, feed_id=None, experiment=None):
@@ -302,8 +340,17 @@ def read_feed(rss_url, feed_id=None, experiment=None):
     )
     if response is None:
         return
-    # Turn stream into memory stream object for universal feedparser
-    content = BytesIO(response.content)
+    try:
+        if response.status_code >= 400:
+            logger.error(
+                "RSS request returned HTTP %s: %s", response.status_code, rss_url
+            )
+            return
+        content = BytesIO(response.content)
+    finally:
+        close_response = getattr(response, "close", None)
+        if close_response:
+            close_response()
     # Parse content
     feed = feedparser.parse(content)
     return feed
@@ -320,8 +367,17 @@ def read_html(html_url, experiment=None, feed_id=None, identifier=None):
     )
     if response is None:
         return
-    # Turn stream into memory stream object for universal feedparser
-    content = BytesIO(response.content)
+    try:
+        if response.status_code >= 400:
+            logger.error(
+                "HTML request returned HTTP %s: %s", response.status_code, html_url
+            )
+            return
+        content = BytesIO(response.content)
+    finally:
+        close_response = getattr(response, "close", None)
+        if close_response:
+            close_response()
     # Parse content
     # html = lh.fromstring(content)
     html = lh.parse(content)
@@ -388,8 +444,6 @@ def convert_to_unicode(text):
     unicode_text = unicode_text.replace("^0", "⁰")
     unicode_text = unicode_text.replace("_0", "₀")
     unicode_text = unicode_text.replace("^*", "*")
-    # Remove parentheses for pp centre-of-mass energy
-    unicode_text = unicode_text.replace("√(s)", "√s")
     return unicode_text
 
 
@@ -444,198 +498,6 @@ def format_title(title):
     # merge s_NN
     text_title = text_title.replace("s_ NN", "s_NN").strip()
     return text_title
-
-
-def execute_command(command):
-    """execute shell command using subprocess..."""
-    proc = subprocess.Popen(
-        command,
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        shell=True,
-        universal_newlines=True,
-    )
-    result = ""
-    exit_code = proc.wait()
-    if exit_code != 0:
-        for line in proc.stderr:
-            result = result + line
-        logger.error(result)
-    else:
-        for line in proc.stdout:
-            result = result + line
-        logger.debug(result)
-
-
-def convert_gif_to_mp4(gif_path, output_path=None):
-    """Convert GIF to MP4 video for BlueSky compatibility."""
-    if output_path is None:
-        output_path = gif_path.replace(".gif", ".mp4")
-
-    try:
-        command = (
-            f"ffmpeg -i {gif_path} -movflags faststart -pix_fmt yuv420p -vf "
-            f'"scale=trunc(iw/2)*2:trunc(ih/2)*2" -y {output_path}'
-        )
-        execute_command(command)
-        if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
-            logger.info(f"Successfully converted {gif_path} to {output_path}")
-            return output_path
-        else:
-            logger.error(f"MP4 conversion failed or produced empty file for {gif_path}")
-            return None
-    except Exception as e:
-        logger.error(f"Error converting GIF to MP4: {e}")
-        return None
-
-
-def process_images(
-    identifier, downloaded_image_list, post_gif, use_wand=True, platform="twitter"
-):
-    """Convert/resize all images to png."""
-    logger.info("Processing %d images." % len(downloaded_image_list))
-    logger.debug(
-        "process_images(): identifier = {}, downloaded_image_list = {},\
-                  use_wand = {}".format(identifier, downloaded_image_list, use_wand)
-    )
-    image_list = []
-    images_for_gif = []
-    max_dim = [0, 0]
-    new_image_format = "png"
-    # also calculate average dimensions to scale down very large images
-    dim_list_x = []
-    dim_list_y = []
-
-    # first loop to find maximum PDF dimensions to have high quality images
-    for image_file in downloaded_image_list:
-        if use_wand:
-            # , resolution=300
-            try:
-                with Image(filename="{}[0]".format(image_file)) as img:
-                    # process pdfs here only, others seem to be far too big
-                    img.format = new_image_format
-                    img.background_color = Color("white")
-                    img.compression_quality = 85  # was 75
-                    filename = image_file
-                    img.alpha_channel = "remove"
-                    img.trim(fuzz=0.01)
-                    img.reset_coords()  # equivalent of repage
-                    # give the file a different name
-                    filesplit = image_file.rsplit(".", 1)
-                    filename = filesplit[0] + "_." + filesplit[1]
-                    if filename.endswith("pdf"):
-                        filename = filename.replace(".pdf", ".%s" % new_image_format)
-                    # save image in list
-                    image_list.append(filename)
-                    img.save(filename=filename)
-                    dim_list_x.append(img.size[0])
-                    dim_list_y.append(img.size[1])
-                    # need to save max dimensions for gif canvas
-                    for i, _ in enumerate(max_dim):
-                        if img.size[i] > max_dim[i]:
-                            max_dim[i] = img.size[i]
-            except CorruptImageError as corrupt_except:
-                logger.error(
-                    f"CorruptImageError: {corrupt_except} for file {image_file}"
-                )
-                logger.warning(f"Ignoring {image_file} due to CorruptImageError.")
-            except Exception as general_exception:  # pylint: disable=broad-except
-                logger.error(
-                    f"General exception processing image {image_file}: {general_exception}"
-                )
-    # rescale images
-    average_dims = (
-        float(sum(dim_list_x)) / max(len(dim_list_x), 1),
-        float(sum(dim_list_y)) / max(len(dim_list_y), 1),
-    )
-    dim_xy = int(
-        max(min(MAX_IMG_DIM, average_dims[0]), min(MAX_IMG_DIM, average_dims[0]))
-    )
-
-    # reset max_dim again
-    max_dim = [0, 0]
-    # scale individual images
-    for image_file in image_list:
-        if use_wand:
-            filename = image_file
-            with Image(filename=filename) as img:
-                # logger.debug(f"Initial dimensions for {filename}: {img.size[0]}x{img.size[1]}")
-                if (img.size[0] > dim_xy) or (img.size[1] > dim_xy):
-                    scale_factor = dim_xy / float(max(img.size[0], img.size[1]))
-                    area = scale_factor * scale_factor * img.size[0] * img.size[1]
-                    logger.debug(
-                        f"Scaling {filename}: dim_xy={dim_xy}, scale_factor={scale_factor:.2f}, area={area:.0f}, MAX_IMG_DIM_AREA={MAX_IMG_DIM_AREA}, original_size={img.size}"
-                    )
-                    if area > MAX_IMG_DIM_AREA:
-                        scale_factor *= (
-                            float(MAX_IMG_DIM_AREA / area) * 0.97
-                        )  # factor 0.97 accounts for additional margin below
-                    img.resize(
-                        int(img.size[0] * scale_factor), int(img.size[1] * scale_factor)
-                    )
-                for i, _ in enumerate(max_dim):
-                    if img.size[i] > max_dim[i]:
-                        max_dim[i] = img.size[i]
-                img.save(filename=filename)
-
-    # bring list in order again
-    image_list = sorted(image_list)
-    if post_gif:
-        # now we need another loop to create the gif canvas
-        for image_file in image_list:
-            with Image(filename=image_file) as foreground:
-                foreground.format = "gif"
-                image_file = image_file.replace(".%s" % new_image_format, ".gif")
-                # foreground.transform(resize="{0}x{1}".format(*max_dim))
-                add_margin = 1.03
-                with Image(
-                    width=int(max_dim[0] * add_margin),
-                    height=int(max_dim[1] * add_margin),
-                    background=Color("white"),
-                ) as out:
-                    left = int((max_dim[0] * add_margin - foreground.size[0]) / 2)
-                    top = int((max_dim[1] * add_margin - foreground.size[1]) / 2)
-                    out.composite(foreground, left=left, top=top)
-                    out.save(filename=image_file)
-            images_for_gif.append(image_file)
-        img_size = MAX_IMG_SIZE + 1
-        # the gif can only have a certain size, so we loop until it's small enough
-        while img_size > MAX_IMG_SIZE:
-            command = "convert -delay 200 -loop 0 "
-            # command = "gifsicle --delay=120 --loop "
-            command += " ".join(images_for_gif)
-            command += " {id}/{id}.gif".format(id=identifier)
-            # command += ' > {id}/{id}.gif'.format(id=identifier)
-            execute_command(command)
-            img_size = os.path.getsize("{id}/{id}.gif".format(id=identifier))
-            if img_size > MAX_IMG_SIZE:
-                images_for_gif = images_for_gif[:-1]
-                logger.info(
-                    "Image to big ({} bytes), dropping last figure, {} images in GIF".format(
-                        img_size, len(images_for_gif)
-                    )
-                )
-                # os.remove('{id}/{id}.gif'.format(id=identifier))
-            # replace image list by GIF only
-        image_list = ["{id}/{id}.gif".format(id=identifier)]
-
-        # For BlueSky platform, convert GIF to MP4
-        if platform == "bluesky":
-            gif_path = "{id}/{id}.gif".format(id=identifier)
-            mp4_path = convert_gif_to_mp4(gif_path)
-            if mp4_path and os.path.exists(mp4_path):
-                image_list = [mp4_path]
-                logger.info(f"Created MP4 for BlueSky: {mp4_path}")
-            else:
-                logger.warning(
-                    "Failed to create MP4 for BlueSky, falling back to static images"
-                )
-                # Return individual PNG files instead
-                image_list = sorted(
-                    [img for img in image_list if not img.endswith(".gif")]
-                )[:4]
-    return image_list
 
 
 def twitter_auth(auth_dict):
@@ -753,7 +615,7 @@ def twitter_upload_images(twitter, image_list, post_gif):
                         f"Twitter GIF upload error for {image_path}: {tweepy_exception}"
                     )
                     logger.error(f"Response state: {response}")
-                    sys.exit(1)
+                    raise tweepy_exception
                 logger.info(response)
                 image_ids.append(response.media_id)
         else:
@@ -764,14 +626,14 @@ def twitter_upload_images(twitter, image_list, post_gif):
                     f"Twitter image upload error for {image_path}: {tweepy_exception}"
                 )
                 logger.error(f"Response state: {response}")
-                sys.exit(1)
+                raise tweepy_exception
             logger.info(response)
             image_ids.append(response.media_id)
     logger.info(image_ids)
     return image_ids
 
 
-def mastodon_upload_images(mastodon_client, image_list, post_gif):
+def mastodon_upload_images(mastodon_client, image_list, post_gif, alt_text=""):
     """Upload images to Mastodon and return locations."""
     logger.info("Uploading images to Mastodon.")
     image_ids = []
@@ -782,7 +644,8 @@ def mastodon_upload_images(mastodon_client, image_list, post_gif):
                 try:
                     response = mastodon_client.media_post(
                         media_file=image_path,
-                        description=f"Animated GIF image for {image_path.split('/')[0]}",
+                        description=alt_text
+                        or f"Animated GIF image for {image_path.split('/')[0]}",
                     )
                 except mastodon.MastodonError as mastodon_exception:
                     logger.error(
@@ -795,7 +658,7 @@ def mastodon_upload_images(mastodon_client, image_list, post_gif):
             try:
                 response = mastodon_client.media_post(
                     media_file=image_path,
-                    description=f"Image for {image_path.split('/')[0]}",
+                    description=alt_text or f"Image for {image_path.split('/')[0]}",
                 )
             except mastodon.MastodonError as mastodon_exception:
                 logger.error(
@@ -808,7 +671,9 @@ def mastodon_upload_images(mastodon_client, image_list, post_gif):
     return image_ids
 
 
-def bluesky_upload_media(bluesky_client, media_list, identifier_for_alt_text):
+def bluesky_upload_media(
+    bluesky_client, media_list, identifier_for_alt_text, alt_text=""
+):
     """Upload media (images or video) to BlueSky and return blob references."""
     if not bluesky_client:
         return []
@@ -831,11 +696,13 @@ def bluesky_upload_media(bluesky_client, media_list, identifier_for_alt_text):
 
             blob_response = bluesky_client.com.atproto.repo.upload_blob(video_data)
             logger.info(f"Blob upload response: {blob_response}")
-            alt_text = f"Video animation for {identifier_for_alt_text}"
+            video_alt_text = (
+                alt_text or f"Video animation for {identifier_for_alt_text}"
+            )
 
             # Create video embed
             video_blob = atproto_models.AppBskyEmbedVideo.Main(
-                video=blob_response.blob, alt=alt_text
+                video=blob_response.blob, alt=video_alt_text
             )
             logger.info(f"Video blob: {video_blob}")
             return [video_blob]
@@ -843,26 +710,25 @@ def bluesky_upload_media(bluesky_client, media_list, identifier_for_alt_text):
             logger.error(f"Failed to upload video, falling back to images: {e}")
             # Continue to image upload fallback
 
-    # Fallback: Upload up to 4 static images
-    for image_path in sorted(media_list)[:4]:
-        if image_path.endswith(".mp4"):
-            continue  # Skip mp4 files in image processing
+    # Fallback: Upload up to 4 static images supplied alongside the preferred video.
+    image_files = [path for path in media_list if not path.endswith(".mp4")]
+    for image_path in sorted(image_files)[:4]:
         try:
             with open(image_path, "rb") as f:
                 img_data = f.read()
 
-            alt_text = (
+            image_alt_text = alt_text or (
                 f"Image for {identifier_for_alt_text}: {os.path.basename(image_path)}"
             )
             # Truncate alt text if too long
             max_alt_text_len = 500
-            if len(alt_text) > max_alt_text_len:
-                alt_text = alt_text[: max_alt_text_len - 3] + "..."
+            if len(image_alt_text) > max_alt_text_len:
+                image_alt_text = image_alt_text[: max_alt_text_len - 3] + "..."
 
             response = bluesky_client.com.atproto.repo.upload_blob(img_data)
             image_blobs.append(
                 atproto_models.AppBskyEmbedImages.Image(
-                    image=response.blob, alt=alt_text
+                    image=response.blob, alt=image_alt_text
                 )
             )
             logger.info(f"BlueSky: Uploaded {image_path}")
@@ -966,22 +832,24 @@ def tweet(
     image_ids,
     post_gif,
     bot_handle,
+    message_list=None,
 ):
     """tweet the new results with title and link and pictures taking care of length limitations."""
     # type_hashtag: title (identifier) link conf_hashtags
     logger.info("Creating tweet ...")
     # https://dev.twitter.com/rest/reference/get/help/configuration
     tweet_allowed_length = 280
-    message_list = split_text(
-        type_hashtag,
-        title,
-        identifier,
-        link,
-        conf_hashtags,
-        phys_hashtags,
-        tweet_allowed_length,
-        bot_handle,
-    )
+    if message_list is None:
+        message_list = split_text(
+            type_hashtag,
+            title,
+            identifier,
+            link,
+            conf_hashtags,
+            phys_hashtags,
+            tweet_allowed_length,
+            bot_handle,
+        )
     first_message = True
     previous_status_id = None
     response = {}
@@ -1004,7 +872,7 @@ def tweet(
                         f"TweepyException during first message (GIF) tweet: {tweepy_exception}"
                     )
                     logger.error(f"Response state: {response}")
-                    sys.exit(1)
+                    return None
                 first_message = False
                 logger.debug(response)
             else:
@@ -1025,12 +893,12 @@ def tweet(
                     response = twitter.create_tweet(
                         text=message,
                         media_ids=image_ids[i * 4 : (i + 1) * 4],
-                        in_reply_to_status_id=previous_status_id,
+                        in_reply_to_tweet_id=previous_status_id,
                     )
                 else:
                     response = twitter.create_tweet(
                         text=message,
-                        in_reply_to_status_id=previous_status_id,
+                        in_reply_to_tweet_id=previous_status_id,
                     )
             except tweepy.TweepyException as tweepy_exception:
                 logger.error(f"TweepyException during image tweet: {tweepy_exception}")
@@ -1051,21 +919,23 @@ def toot(
     image_ids,
     post_gif,
     bot_handle,
+    message_list=None,
 ):
     """toot the new results with title and link and pictures taking care of length limitations."""
     # type_hashtag: title (identifier) link conf_hashtags
     logger.info("Creating toot ...")
     toot_allowed_length = 500
-    message_list = split_text(
-        type_hashtag,
-        title,
-        identifier,
-        link,
-        conf_hashtags,
-        phys_hashtags,
-        toot_allowed_length,
-        bot_handle,
-    )
+    if message_list is None:
+        message_list = split_text(
+            type_hashtag,
+            title,
+            identifier,
+            link,
+            conf_hashtags,
+            phys_hashtags,
+            toot_allowed_length,
+            bot_handle,
+        )
     first_message = True
     previous_status_id = None
     response = {}
@@ -1136,8 +1006,14 @@ def skeet(
     bot_handle,
     previous_skeet_ref=None,  # StrongRef of the previous skeet in a thread
     root_skeet_ref=None,  # StrongRef of the root skeet in a thread
+    message_list=None,
 ):
-    """Post (skeet) the new results to BlueSky."""
+    """Post a Bluesky thread once, returning the root post reference.
+
+    Publication retries are deliberately handled by the caller after a public
+    account preflight. Retrying here after an ambiguous response can create an
+    exact duplicate root post.
+    """
     if (
         not bluesky_client
         or BlueskyClient is None
@@ -1147,25 +1023,20 @@ def skeet(
         logger.error("BlueSky client or models not available. Skipping skeet.")
         return None
 
-    # BlueSky allows 300 chars per post.
-    # Facets (links, mentions) count towards this limit.
-    # Link cards are not yet fully supported by atproto for creation in the same way as text facets.
-    # We will include the link directly in the text.
-    skeet_allowed_length = 300
-
-    message_list = split_text(
-        type_hashtag,
-        title,
-        identifier,
-        link,
-        conf_hashtags,
-        phys_hashtags,
-        skeet_allowed_length,
-        bot_handle,
-    )
+    if message_list is None:
+        message_list = split_text(
+            type_hashtag,
+            title,
+            identifier,
+            link,
+            conf_hashtags,
+            phys_hashtags,
+            300,
+            bot_handle,
+        )
 
     logger.info("Creating skeet ...")
-    response_summary = {}  # To store the URI and CID of the last successful skeet
+    root_response = None
 
     for i, message_text in enumerate(message_list):
         logger.info(f"Skeet part {i + 1}: {message_text}")
@@ -1234,7 +1105,8 @@ def skeet(
             logger.debug(f"Skeet part {i + 1} response: {response}")
             current_skeet_strong_ref = atproto_models.create_strong_ref(response)  # pyright: ignore [reportOptionalMemberAccess]
 
-            response_summary = {"uri": response.uri, "cid": response.cid}  # pyright: ignore [reportOptionalMemberAccess, reportAttributeAccessIssue]
+            if root_response is None:
+                root_response = {"uri": response.uri, "cid": response.cid}  # pyright: ignore [reportOptionalMemberAccess, reportAttributeAccessIssue]
 
             if i == 0:  # If this is the first skeet
                 root_skeet_ref = current_skeet_strong_ref  # It becomes the root for subsequent replies
@@ -1242,234 +1114,86 @@ def skeet(
                 current_skeet_strong_ref  # Current skeet becomes parent for the next
             )
 
-        except BlueskyAtpApiError as e:  # pyright: ignore [reportPossiblyUnboundVariable]
-            logger.error(f"BlueSky API error during skeet part {i + 1}: {e}")
-            if i == 0 and embed_to_post:  # If first post with media failed
-                logger.info(
-                    "BlueSky: Skeet with media failed. Attempting skeet without media."
-                )
-                try:
-                    post_record_no_media = atproto_models.AppBskyFeedPost.Record(  # Changed from .Main to .Record
-                        text=message_text,
-                        created_at=bluesky_client.get_current_time_iso(),  # pyright: ignore [reportOptionalMemberAccess]
-                        reply=reply_ref_for_this_skeet,
-                        # langs=langs, # TODO: Add language detection
-                    )
-                    record_data_no_media = (
-                        atproto_models.ComAtprotoRepoCreateRecord.Data(  # pyright: ignore [reportOptionalMemberAccess]
-                            repo=bluesky_client.me.did,  # pyright: ignore [reportOptionalMemberAccess, reportUnknownMemberType]
-                            collection=atproto_models.ids.AppBskyFeedPost,  # pyright: ignore [reportOptionalMemberAccess]
-                            record=post_record_no_media.model_dump(exclude_none=True),
-                        )
-                    )
-                    response = bluesky_client.com.atproto.repo.create_record(
-                        data=record_data_no_media
-                    )  # pyright: ignore [reportOptionalMemberAccess, reportUnknownMemberType]
-
-                    logger.debug(
-                        f"Skeet part {i + 1} (no media fallback) response: {response}"
-                    )
-                    current_skeet_strong_ref = atproto_models.create_strong_ref(
-                        response
-                    )  # pyright: ignore [reportOptionalMemberAccess]
-                    response_summary = {"uri": response.uri, "cid": response.cid}  # pyright: ignore [reportOptionalMemberAccess, reportAttributeAccessIssue]
-
-                    if i == 0:
-                        root_skeet_ref = current_skeet_strong_ref
-                    previous_skeet_ref = current_skeet_strong_ref
-                except Exception as e_fallback:
-                    logger.error(
-                        f"BlueSky: Skeet without media (fallback) also failed for part {i + 1}: {e_fallback}"
-                    )
-                    return None  # Failed even without media
-            else:  # If non-first post failed, or first post without media failed
-                return None  # Stop trying for this item
-        except Exception as e:
-            logger.error(f"Generic error during skeet part {i + 1}: {e}")
-            # Similar fallback for generic errors on the first post with media
-            if i == 0 and embed_to_post:
-                logger.info(
-                    "BlueSky: Skeet with media failed (generic error). Attempting skeet without media."
-                )
-                try:
-                    post_record_no_media_generic = atproto_models.AppBskyFeedPost.Record(  # Changed from .Main to .Record
-                        text=message_text,
-                        created_at=bluesky_client.get_current_time_iso(),  # pyright: ignore [reportOptionalMemberAccess]
-                        reply=reply_ref_for_this_skeet,
-                        # langs=langs,
-                    )
-                    record_data_no_media_generic = (
-                        atproto_models.ComAtprotoRepoCreateRecord.Data(  # pyright: ignore [reportOptionalMemberAccess]
-                            repo=bluesky_client.me.did,  # pyright: ignore [reportOptionalMemberAccess, reportUnknownMemberType]
-                            collection=atproto_models.ids.AppBskyFeedPost,  # pyright: ignore [reportOptionalMemberAccess]
-                            record=post_record_no_media_generic.model_dump(
-                                exclude_none=True
-                            ),
-                        )
-                    )
-                    response = bluesky_client.com.atproto.repo.create_record(
-                        data=record_data_no_media_generic
-                    )  # pyright: ignore [reportOptionalMemberAccess, reportUnknownMemberType]
-
-                    logger.debug(
-                        f"Skeet part {i + 1} (no media fallback, generic error) response: {response}"
-                    )
-                    current_skeet_strong_ref = atproto_models.create_strong_ref(
-                        response
-                    )  # pyright: ignore [reportOptionalMemberAccess]
-                    response_summary = {"uri": response.uri, "cid": response.cid}  # pyright: ignore [reportOptionalMemberAccess, reportAttributeAccessIssue]
-
-                    if i == 0:
-                        root_skeet_ref = current_skeet_strong_ref
-                    previous_skeet_ref = current_skeet_strong_ref
-                except Exception as e_fallback_generic:
-                    logger.error(
-                        f"BlueSky: Skeet without media (fallback after generic error) also failed for part {i + 1}: {e_fallback_generic}"
-                    )
-                    return None
-            else:
-                return None  # Stop trying for this item
+        except BlueskyAtpApiError as exception:  # pyright: ignore [reportPossiblyUnboundVariable]
+            logger.error("BlueSky API error during skeet part %d: %s", i + 1, exception)
+            return None
+        except Exception as exception:
+            logger.error("Generic error during skeet part %d: %s", i + 1, exception)
+            return None
 
         # If there are more messages, wait a bit before posting the next part of the thread
         if i < len(message_list) - 1:
             time.sleep(2)  # Short delay for threading
 
-    return response_summary  # Return the URI and CID of the last (or only) skeet
+    return root_response
 
 
-def skeet_with_media(
-    bluesky_client,
-    type_hashtag,
-    title,
-    identifier,
-    link,
-    conf_hashtags,
-    phys_hashtags,
-    media_embeds,  # List of embed objects from bluesky_upload_media
-    bot_handle,
-):
-    """Post (skeet) the new results to BlueSky with video/image support."""
-    if not bluesky_client:
-        return None
-
-    logger.info("Creating skeet with media...")
-    skeet_allowed_length = 300
-
-    message_list = split_text(
-        type_hashtag,
-        title,
-        identifier,
-        link,
-        conf_hashtags,
-        phys_hashtags,
-        skeet_allowed_length,
-        bot_handle,
-    )
-
-    previous_skeet_ref = None
-    root_skeet_ref = None
-    response_summary = {}
-
-    for i, message_text in enumerate(message_list):
-        logger.info(f"Skeet part {i + 1}: {message_text}")
-        logger.debug(f"Length: {len(message_text)}")
-
-        # Only add media to the first skeet
-        embed_to_post = None
-        if i == 0 and media_embeds:
-            embed_to_post = media_embeds[0]  # Use the first (and typically only) embed
-
-        reply_ref = None
-        if previous_skeet_ref:
-            reply_ref = atproto_models.AppBskyFeedPost.ReplyRef(
-                parent=previous_skeet_ref, root=root_skeet_ref
-            )
-
-        try:
-            post_record = atproto_models.AppBskyFeedPost.Record(
-                text=message_text,
-                created_at=bluesky_client.get_current_time_iso(),
-                embed=embed_to_post,
-                reply=reply_ref,
-            )
-
-            response = bluesky_client.com.atproto.repo.create_record(
-                repo=bluesky_client.me.did,
-                collection=atproto_models.ids.AppBskyFeedPost,
-                record=post_record.model_dump(exclude_none=True),
-            )
-            logger.debug(f"BlueSky response: {response}")
-
-            current_skeet_strong_ref = atproto_models.create_strong_ref(response)
-            if i == 0:
-                root_skeet_ref = current_skeet_strong_ref
-                response_summary = {"uri": response.uri, "cid": response.cid}
-            previous_skeet_ref = current_skeet_strong_ref
-
-        except Exception as e:
-            logger.error(f"Error during skeet part {i + 1}: {e}")
-            return None
-
-    return response_summary
+def attachment_candidates(experiment, post):
+    """Classify relevant feed attachments without external metadata."""
+    candidates = []
+    for media in post.get("media_content", []):
+        media_url = media.get("url", "")
+        if not media_url:
+            continue
+        path = urlparse(media_url).path
+        filename = Path(path).name.casefold()
+        suffix = Path(path).suffix.casefold()
+        kind = None
+        if experiment.upper() == "CMS":
+            if re.search(r"/files/.*figures?_", path, flags=re.IGNORECASE):
+                kind = "figure"
+        elif experiment.upper() == "ATLAS":
+            if suffix in {".png", ".jpg", ".jpeg"}:
+                kind = "figure"
+            elif suffix == ".pdf" and not re.search(r"^fig", filename):
+                kind = "document"
+        elif experiment.upper() == "LHCB":
+            if suffix == ".zip":
+                kind = "archive"
+        elif suffix in {".png", ".jpg", ".jpeg", ".pdf"} and re.search(
+            r"(?:^|[_-])fig(?:ure)?", filename
+        ):
+            kind = "figure"
+        if kind:
+            candidates.append((media_url, kind))
+    return candidates
 
 
-def check_id_exists(identifier, feed_id, prefix=""):
-    """Check with ID of the analysis already exists in text file to avoid tweeting again."""
-    txt_file_name = f"{prefix}{feed_id}.txt"
-    # create file if it doesn't exist yet
-    if not os.path.isfile(txt_file_name):
-        open(txt_file_name, "a").close()
-    with open(txt_file_name) as txt_file:
-        for line in txt_file:
-            if identifier == line.strip("\n"):
-                return True
-    return False
+def bluesky_post_url(handle, uri):
+    """Build the public Bluesky URL for an AT URI."""
+    record_key = str(uri).rsplit("/", 1)[-1]
+    return f"https://bsky.app/profile/{handle}/post/{record_key}"
 
 
-def store_id(identifier, feed_id, prefix=""):
-    """Store ID of the analysis in text file to avoid tweeting again."""
-    txt_file_name = f"{prefix}{feed_id}.txt"
-    with open(txt_file_name, "a") as txt_file:
-        txt_file.write("%s\n" % identifier)
-
-
-def main():
-    """Main function."""
-    dry_run = False  # run without tweeting
-    analysis_id = ""
-    keep_image_dir = False
-    list_analyses = False
-    post_gif = True
-    use_arxiv_link = False
-
-    # parse arguments
+def build_argument_parser():
+    """Create the command-line interface shared by local and scheduled runs."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "-d", "--dry", help="perform dry run without tweeting", action="store_true"
+        "-d", "--dry", help="perform dry run without posting", action="store_true"
     )
     parser.add_argument(
         "-v", "--verbose", help="enable verbose output", action="store_true"
     )
-    parser.add_argument("-a", "--analysis", help="tweet specific analysis", type=str)
+    parser.add_argument("-a", "--analysis", help="post a specific analysis", type=str)
     parser.add_argument(
-        "-m", "--max", help="maximum number of analyses to tweet", type=int, default=3
+        "-m", "--max", help="maximum number of analyses to post", type=int, default=3
     )
     parser.add_argument(
-        "-k", "--keep", help="keep image directory", action="store_true"
+        "-k", "--keep", help="keep media directories", action="store_true"
     )
     parser.add_argument(
-        "-l", "--list", help="list analyses for feeds, then quit", action="store_true"
+        "-l", "--list", help="list feed analyses, then quit", action="store_true"
     )
     parser.add_argument("-g", "--nogif", help="do not create GIF", action="store_true")
     parser.add_argument(
         "-f",
         "--figmax",
-        help="maximum number of figures to use for GIF",
+        help="maximum number of figures to use",
         type=int,
         default=20,
     )
     parser.add_argument(
-        "-e", "--experiment", help="experiment to tweet for", type=str, default="CMS"
+        "-e", "--experiment", help="experiment to post for", type=str, default="CMS"
     )
     parser.add_argument(
         "-c",
@@ -1481,768 +1205,463 @@ def main():
     parser.add_argument(
         "--auth", help="name of auth config file", type=str, default="auth.ini"
     )
-    parser.add_argument("--arXiv", help="use arXiv link", action="store_true")
-    args = parser.parse_args()
-    max_tweets = args.max
-    max_figures = args.figmax
-    if args.dry:
-        dry_run = True
-    if args.verbose:
-        global logger
-        logger.setLevel(logging.DEBUG)
-    if args.keep:
-        keep_image_dir = True
-    if args.list:
-        list_analyses = True
-    if args.nogif:
-        post_gif = False
-    if args.analysis:
-        analysis_id = args.analysis
-        max_tweets = 1
-        logger.info("Looking for analysis with ID %s" % analysis_id)
-    experiment = args.experiment
-    feed_file = args.config
-    auth_file = args.auth
-    use_arxiv_link = args.arXiv
+    parser.add_argument("--arXiv", help="use validated arXiv link", action="store_true")
+    parser.add_argument(
+        "--cover-mode",
+        choices=("auto", "none"),
+        default="auto",
+        help="add the configured title page or branded cover",
+    )
+    return parser
 
-    config = load_config(experiment, feed_file, auth_file)
 
-    feed_entries = []
-    for key in config["FEED_DICT"]:
-        logger.info(f"Getting feed for {key}")
-        this_feed = read_feed(
-            config["FEED_DICT"][key], feed_id=key, experiment=experiment
+def _load_feed_entries(config, experiment, run_summary):
+    entries = []
+    failed = False
+    for feed_id, rss_url in config["FEED_DICT"].items():
+        logger.info("Getting feed for %s", feed_id)
+        feed = read_feed(rss_url, feed_id=feed_id, experiment=experiment)
+        if not feed:
+            logger.error("Could not read feed %s", feed_id)
+            run_summary.add("feed_failed", feed_id=feed_id)
+            failed = True
+            continue
+        feed_entries = feed.get("entries", [])
+        logger.info("Found %d items", len(feed_entries))
+        for entry in feed_entries:
+            entry["feed_id"] = feed_id
+        entries.extend(feed_entries)
+    return entries, failed
+
+
+def _prepare_publication_media(publication, post, maximum_figures, output_directory):
+    downloaded = download_media_candidates(
+        attachment_candidates(publication.experiment, post),
+        output_directory / "downloads",
+        experiment=publication.experiment,
+        feed_id=publication.feed_id,
+        identifier=publication.identifier,
+    )
+    figures = [path for kind, path in downloaded if kind == "figure"]
+    documents = [path for kind, path in downloaded if kind == "document"]
+    archives = [path for kind, path in downloaded if kind == "archive"]
+    if archives:
+        figures = safe_extract_lhcb_figures(
+            archives[0], output_directory / "archive", maximum_figures
         )
-        if this_feed:
-            this_feed_entries = this_feed["entries"]
-            logger.info("Found %d items" % len(this_feed_entries))
-            # add feed info to entries so that we can loop more easily later
-            for index, _ in enumerate(this_feed_entries):
-                this_feed_entries[index]["feed_id"] = key
-            feed_entries += this_feed_entries
-        else:
-            logger.warning(f"Found no items for feed {key}")
-    if list_analyses:
-        # sort by feed_id, then date
-        logger.info("List of available analyses:")
+    figures = order_media(figures)[:maximum_figures]
+    return Publication(
+        experiment=publication.experiment,
+        feed_id=publication.feed_id,
+        identifier=publication.identifier,
+        title=publication.title,
+        link=publication.link,
+        lifecycle_stage=publication.lifecycle_stage,
+        media_paths=tuple(figures),
+        document_paths=tuple(documents),
+    )
+
+
+def _adopt_remote_delivery(publication, platform, config, ledger, run_summary):
+    rendered = (
+        MastodonRenderer().render(publication)
+        if platform == "mastodon"
+        else BlueskyRenderer().render(publication)
+    )
+    expected_text_hash = hashlib.sha256(
+        rendered.messages[0].encode("utf-8")
+    ).hexdigest()
+    if platform == "mastodon":
+        existing = find_existing_mastodon_post(
+            config["AUTH"].get("MASTODON_BOT_HANDLE", ""),
+            publication.identifier,
+            expected_text_hash=expected_text_hash,
+        )
+    else:
+        existing = find_existing_bluesky_post(
+            config["AUTH"].get("BLUESKY_HANDLE", ""),
+            publication.identifier,
+            expected_text_hash=expected_text_hash,
+        )
+    if not existing:
+        return False
+    post_id, post_url = existing
+    ledger.mark(
+        publication,
+        platform,
+        post_id=post_id,
+        post_url=post_url,
+        adopted=True,
+    )
+    run_summary.add(
+        "adopted",
+        platform=platform,
+        identifier=publication.identifier,
+        post_url=post_url,
+    )
+    logger.info("Adopted existing %s post %s", platform, post_url)
+    return True
+
+
+def main():
+    """Publish normalized feed entries with shared media and durable state."""
+    args = build_argument_parser().parse_args()
+    if args.verbose:
+        logger.setLevel(logging.DEBUG)
+    maximum_posts = 1 if args.analysis else args.max
+    experiment = args.experiment
+    config = load_config(experiment, args.config, args.auth)
+    ledger = DeliveryLedger(Path("delivery-ledger"), experiment)
+    migrated = ledger.migrate_legacy(Path.cwd())
+    if migrated:
+        logger.info("Migrated %d legacy delivery records", migrated)
+    run_summary = RunSummary(experiment=experiment)
+
+    def write_run_summary():
+        with open("run-summary.json", "w", encoding="utf-8") as summary_file:
+            json.dump(
+                {"experiment": experiment, "events": run_summary.events},
+                summary_file,
+                indent=2,
+                sort_keys=True,
+                ensure_ascii=False,
+            )
+            summary_file.write("\n")
+
+    atexit.register(write_run_summary)
+    feed_entries, feed_failed = _load_feed_entries(config, experiment, run_summary)
+    if args.list:
         for post in sorted(
             feed_entries,
-            key=lambda x: (x["feed_id"], maya.parse(x["published"]).datetime()),
+            key=lambda item: (
+                item["feed_id"],
+                maya.parse(item["published"]).datetime(),
+            ),
         ):
             logger.info(
-                " - {post_id} ({feed_id}), published {date}".format(
-                    post_id=post["dc_source"],
-                    feed_id=post["feed_id"],
-                    date=post["published"],
-                )
+                " - %s (%s), published %s",
+                post["dc_source"],
+                post["feed_id"],
+                post["published"],
             )
+        if feed_failed:
+            raise SystemExit(1)
         return
+
     twitter_client = twitter_auth(config["AUTH"])
     mastodon_client = mastodon_auth(config["AUTH"])
-    bluesky_client = None
-    if BlueskyClient is not None:  # Check if atproto was imported
-        bluesky_client = bluesky_auth(config["AUTH"])
-        if bluesky_client is None:
-            logger.info(
-                "BlueSky client initialization failed, BlueSky features will be skipped."
-            )
-    else:
-        logger.info(
-            "BlueSky library (atproto) not installed at top level, skipping BlueSky features."
-        )
+    bluesky_client = bluesky_auth(config["AUTH"])
+    required_platforms = []
+    if twitter_client:
+        required_platforms.append("twitter")
+    if mastodon_client:
+        required_platforms.append("mastodon")
+    if bluesky_client:
+        required_platforms.append("bluesky")
+    if "BLUESKY_HANDLE" in config["AUTH"] and not bluesky_client:
+        run_summary.add("failed", platform="bluesky", reason="authentication")
+        required_platforms.append("bluesky")
 
-    # loop over posts sorted by date
-    tweet_count = 0
-    toot_count = 0
-    skeet_count = 0  # New counter for BlueSky
+    posted_count = 0
     for post in sorted(
-        feed_entries, key=lambda x: maya.parse(x["published"]).datetime()
+        feed_entries, key=lambda item: maya.parse(item["published"]).datetime()
     ):
-        do_toot = True
-        do_tweet = True
-        do_skeet = True
-        downloaded_image_list = []
-        n_figures = 0
-        downloaded_doc_list = []
-        logger.debug(post)
         identifier = post["dc_source"]
-        # fix wrong PAS name:
-        parse_result = re.match(r"(CMS-PAS-).{3}-([A-Z]{3}-\d{2}-\d{3})-.*", identifier)
-        if parse_result:
-            new_identifier = parse_result.group(1) + parse_result.group(2)
-            logger.info(f"Replacing ID {identifier} by {new_identifier}")
-            identifier = new_identifier
-        if analysis_id:
-            if analysis_id not in identifier:
-                continue
-            else:
-                logger.info("Found %s in feed %s" % (identifier, post["feed_id"]))
-        else:
-            if twitter_client:
-                if check_id_exists(identifier, post["feed_id"], prefix="TWITTER_"):
-                    logger.debug(
-                        "%s has already been tweeted for feed %s"
-                        % (identifier, post["feed_id"])
-                    )
-                    do_tweet = False
-            else:
-                do_tweet = False
-            if mastodon_client:
-                if check_id_exists(identifier, post["feed_id"], prefix="MASTODON_"):
-                    logger.debug(
-                        "%s has already been tooted for feed %s"
-                        % (identifier, post["feed_id"])
-                    )
-                    do_toot = False
-            else:
-                do_toot = False
-
-            if bluesky_client:  # Only check if client is available
-                if check_id_exists(identifier, post["feed_id"], prefix="BLUESKY_"):
-                    logger.debug(
-                        "%s has already been skeeted for feed %s"
-                        % (identifier, post["feed_id"])
-                    )
-                    do_skeet = False
-            else:  # If client is None (not configured or auth failed)
-                do_skeet = False
-
-        if not do_toot and not do_tweet and not do_skeet:  # Updated condition
-            continue
-        logger.info(
-            "{id} - published: {date}".format(
-                id=identifier, date=maya.parse(post["published"]).datetime()
-            )
+        malformed_pas = re.match(
+            r"(CMS-PAS-).{3}-([A-Z]{3}-\d{2}-\d{3})-.*", identifier
         )
+        if malformed_pas:
+            identifier = malformed_pas.group(1) + malformed_pas.group(2)
+        if args.analysis and args.analysis not in identifier:
+            continue
 
-        arxiv_id = ""
-        # try to find arXiv ID
+        arxiv_link = None
         if identifier.startswith("arXiv"):
-            arxiv_id = identifier.rsplit(":", 1)[1]
-            logger.info("Found arXiv ID arXiv:%s" % arxiv_id)
-            arxiv_link = "https://arxiv.org/abs/%s" % arxiv_id
-            logger.debug(arxiv_link)
-            request = request_with_retries(
-                arxiv_link,
+            arxiv_id = identifier.rsplit(":", 1)[-1]
+            candidate_link = f"https://arxiv.org/abs/{arxiv_id}"
+            response = request_with_retries(
+                candidate_link,
                 phase="arXiv validation",
                 experiment=experiment,
                 identifier=identifier,
             )
-            if request is None or request.status_code >= 400:
-                logger.warning(f"arXiv URL {arxiv_link} seems invalid")
-                arxiv_link = None
+            if response is not None:
+                if response.status_code < 400:
+                    arxiv_link = candidate_link
+                response.close()
+        link = arxiv_link if args.arXiv and arxiv_link else post.link
+        publication = Publication(
+            experiment=experiment,
+            feed_id=post["feed_id"],
+            identifier=identifier,
+            title=format_title(post.title),
+            link=link,
+            lifecycle_stage=lifecycle_stage_for(identifier),
+        )
 
-        # looking for media
-        media_content = []
-        if "media_content" in post:
-            media_content += post["media_content"]
-        outdir = identifier.replace(":", "_")
-        if not os.path.exists(outdir):
-            os.makedirs(outdir)
-        logger.debug("Attempting to download media.")
-        # media also includes on the physics
-        phys_hashtags = ""
-        for media in media_content:
-            media_url = media["url"]
-            media_found = False
-            media_isimage = False
-            if media_url.find("cadi?ancode=") >= 0:
-                parse_result = re.match(r".*ancode=(\w{3})-\d{2}-\d{3}", media_url)
-                if parse_result:
-                    if parse_result[1] in CADI_TO_HASHTAG:
-                        phys_hashtags = CADI_TO_HASHTAG[parse_result[1]]
-                        logger.info(f"Found physics tag: {phys_hashtags}")
-            # consider only attached figures and main doc
-            if experiment == "CMS":
-                # CMS follows a certain standard
-                # but figures can be both PDF and PNG
-                if re.search(r"/files\/.*[Ff]igures?_", media_url):
-                    media_found = True
-                    media_isimage = True
-            elif experiment == "ATLAS":
-                # ATLAS seems to only use PNG format for plots
-                if media_url.lower().endswith(".png"):
-                    media_found = True
-                    media_isimage = True
-                elif re.search(
-                    r"^" + re.escape(post.link) + "/files\/(?![Ff]ig).*\.pdf$",
-                    media_url,
-                ):
-                    media_found = True
-            elif experiment == "LHCb":
-                # LHCb attaches figures as a ZIP file
-                if media_url.lower().endswith(".zip"):
-                    logger.info("Found ZIP file for LHCb: " + media_url)
-                    media_found = True
-                    media_isimage = True  # Treat ZIP as images for now
-            # check if media can be downloaded
-            if media_found:
-                media_url = media_url.split("?", 1)[0]
-                logger.debug("media: " + media_url)
-                if not media_url_exists(
-                    media_url,
-                    experiment=experiment,
-                    feed_id=post["feed_id"],
-                    identifier=identifier,
-                ):
-                    media_found = False
-            # download and categorise media
-            if media_found:
-                # download images
-                out_path = "{}/{}".format(outdir, media_url.rsplit("/", 1)[1])
-                if download_media_url(
-                    media_url,
-                    out_path,
-                    experiment=experiment,
-                    feed_id=post["feed_id"],
-                    identifier=identifier,
-                ):
-                    if out_path.find("%") >= 0:
-                        continue
-                    if media_isimage:
-                        downloaded_image_list.append(out_path)
-                        logger.debug("image: " + out_path + " downloaded!")
-                        n_figures += 1
-                    else:
-                        downloaded_doc_list.append(out_path)
-                        logger.debug("doc: " + out_path + " downloaded!")
-            if n_figures >= max_figures:
-                break
-
-        # ATLAS notes workaround
-        if experiment == "ATLAS" and len(downloaded_image_list) == 0:
-            confnotepageurl = (
-                "https://atlas.web.cern.ch/Atlas/GROUPS/PHYSICS/CONFNOTES/"
-                + identifier
-                + "/"
+        enabled = {
+            "twitter": bool(twitter_client),
+            "mastodon": bool(mastodon_client),
+            "bluesky": bool(bluesky_client),
+        }
+        deliver = {}
+        for platform, is_enabled in enabled.items():
+            if not is_enabled:
+                deliver[platform] = False
+                continue
+            deliver[platform] = bool(
+                args.analysis or not ledger.delivered(publication, platform)
             )
-            confnote_html = read_html(
-                confnotepageurl,
-                experiment=experiment,
-                feed_id=post["feed_id"],
-                identifier=identifier,
-            )
-            linkedimages = []
-            if confnote_html is not None:
-                linkedimages = confnote_html.xpath("//a[img]/@href")
-            for image in linkedimages:
-                # ATLAS only uses PNG format for plots
-                if not image.lower().endswith(".png"):
-                    continue
-                # skip tables and aux for this purpose
-                if image.lower().startswith("tab") or "aux" in image.lower():
-                    continue
-                # now this part is (for now) just a copy-n-paste from above (sorry about that)
-                media_found = True
-                media_url = confnotepageurl + image
-                logger.debug("media: " + media_url)
-                if not media_url_exists(
-                    media_url,
-                    experiment=experiment,
-                    feed_id=post["feed_id"],
-                    identifier=identifier,
-                ):
-                    media_found = False
-
-                if media_found:
-                    # download images
-                    out_path = "{}/{}".format(outdir, media_url.rsplit("/", 1)[1])
-                    if download_media_url(
-                        media_url,
-                        out_path,
-                        experiment=experiment,
-                        feed_id=post["feed_id"],
-                        identifier=identifier,
-                    ):
-                        if out_path.find("%") >= 0:
-                            continue
-                        downloaded_image_list.append(out_path)
-
-        # if there's a zip file and only one PDF, the figures are probably in the zip file
-        if any(".zip" in s for s in downloaded_image_list):
-            logger.info("using zip file instead of images")
-            zipfile_name = [s for s in downloaded_image_list if ".zip" in s][0]
-            downloaded_image_list = []
-            outzip = f"{outdir}/zipdir"
-            os.makedirs(outzip)
-            with zipfile.ZipFile(zipfile_name) as myzip:
-                myzip.extractall(outzip)
-            image_list = list(Path(outzip).rglob("*.pdf"))
-            # need to convert PosixPath to str
-            str_image_list = [str(img_path) for img_path in image_list]
-            # ignore some files
-            for img_path in sorted(str_image_list):
-                if not (
-                    (img_path.find("lhcb-logo.pdf") >= 0)
-                    or (img_path.find("__MACOSX") >= 0)
-                    or (img_path.rsplit("/", 1)[1].startswith("."))
-                ):
-                    downloaded_image_list.append(img_path)
-
-        twitter_image_ids = []
-        mastodon_image_ids = []
-        bluesky_image_blobs = []
-
-        if downloaded_image_list:
-            # Twitter processing and upload
-            if twitter_client:
-                try:
-                    logger.info(
-                        f"Twitter: Initial media processing & upload (post_gif={post_gif})."
-                    )
-                    # Process images for Twitter based on the global post_gif flag.
-                    # Twitter's own fallback logic is handled later in the tweet() function if this upload succeeds but tweeting fails.
-                    image_list_for_twitter = process_images(
-                        outdir, downloaded_image_list, post_gif
-                    )
-                    twitter_image_ids = twitter_upload_images(
-                        twitter_client["v1"], image_list_for_twitter, post_gif
-                    )
-                except (
-                    tweepy.TweepyException
-                ) as e:  # Assuming twitter_upload_images might be changed to raise this
-                    logger.error(
-                        f"Twitter: Initial media upload failed: {e}. Media IDs will be empty."
-                    )
-                    twitter_image_ids = []
-                except Exception as e_twitter_proc:  # Catch other errors like from process_images for twitter
-                    logger.error(
-                        f"Twitter: Error during initial media processing for Twitter: {e_twitter_proc}"
-                    )
-                    twitter_image_ids = []
-
-            # Mastodon processing and upload with fallback
-            if mastodon_client:
-                current_post_gif_for_mastodon = post_gif  # Start with global setting
-                processed_image_list_for_mastodon = []  # To hold images processed for Mastodon
-
-                try:
-                    # Attempt 1 (potentially GIF)
-                    logger.info(
-                        f"Mastodon: Initial media processing (post_gif={current_post_gif_for_mastodon})."
-                    )
-                    processed_image_list_for_mastodon = process_images(
-                        outdir,
-                        downloaded_image_list,
-                        current_post_gif_for_mastodon,
-                    )
-                    logger.info(
-                        f"Mastodon: Attempting initial media upload with {len(processed_image_list_for_mastodon)} item(s)."
-                    )
-                    mastodon_image_ids = mastodon_upload_images(
-                        mastodon_client,
-                        processed_image_list_for_mastodon,
-                        current_post_gif_for_mastodon,
-                    )
-                except mastodon.MastodonError as e:  # Catch any MastodonError first
-                    logger.warning(
-                        f"Mastodon: Media upload attempt 1 failed with MastodonError: {e}"
-                    )
-                    if (
-                        current_post_gif_for_mastodon
-                        and isinstance(e, mastodon.MastodonAPIError)
-                        and hasattr(e, "http_status")
-                        and e.http_status == 422
-                    ):
-                        logger.info(
-                            "Mastodon: Specific MastodonAPIError (422) for GIF detected. Retrying without GIF."
-                        )
-                        current_post_gif_for_mastodon = False  # Fallback: No GIF
-                        try:
-                            logger.info(
-                                f"Mastodon: Fallback media processing (post_gif={current_post_gif_for_mastodon})."
-                            )
-                            processed_image_list_for_mastodon = process_images(
-                                outdir,
-                                downloaded_image_list,
-                                current_post_gif_for_mastodon,
-                            )  # Re-process
-                            logger.info(
-                                f"Mastodon: Attempting fallback media upload with {len(processed_image_list_for_mastodon)} item(s)."
-                            )
-                            mastodon_image_ids = mastodon_upload_images(
-                                mastodon_client,
-                                processed_image_list_for_mastodon,
-                                current_post_gif_for_mastodon,
-                            )
-                        except (
-                            mastodon.MastodonError
-                        ) as e2:  # Catch errors during fallback upload
-                            logger.error(
-                                f"Mastodon: Media upload fallback attempt failed: {e2}"
-                            )
-                            mastodon_image_ids = []
-                        except (
-                            Exception
-                        ) as e_fallback_proc:  # Catch errors during fallback processing
-                            logger.error(
-                                f"Mastodon: Error during fallback media processing: {e_fallback_proc}"
-                            )
-                            mastodon_image_ids = []
-                    else:
-                        # This was a MastodonError but not the specific 422 GIF error, or GIF was not attempted.
-                        logger.error(
-                            f"Mastodon: Media upload failed (MastodonError was not a 422 GIF error or GIF not attempted): {e}"
-                        )
-                        mastodon_image_ids = []
-                except Exception as e_generic:  # Catch other errors like from process_images in the first attempt
-                    logger.error(
-                        f"Mastodon: Unexpected error during initial media preparation/upload: {e_generic}"
-                    )
-                    mastodon_image_ids = []
-
-                logger.debug(
-                    f"Mastodon image IDs after initial upload section: {mastodon_image_ids}"
+            if (
+                deliver[platform]
+                and not args.analysis
+                and not args.dry
+                and platform in {"mastodon", "bluesky"}
+                and _adopt_remote_delivery(
+                    publication, platform, config, ledger, run_summary
                 )
-
-            # BlueSky processing and upload
-            if bluesky_client and do_skeet:
-                # First attempt: Create GIF and convert to MP4
-                try:
-                    logger.info("BlueSky: Processing images for video conversion")
-                    gif_list = process_images(
-                        outdir, downloaded_image_list, post_gif=True, platform="bluesky"
-                    )
-                    if gif_list and len(gif_list) > 0:
-                        # Convert the GIF to MP4
-                        mp4_path = convert_gif_to_mp4(gif_list[0])
-                        if mp4_path:
-                            # Try uploading the MP4
-                            media_list_for_bluesky = [mp4_path]
-                            bluesky_image_blobs = bluesky_upload_media(
-                                bluesky_client, media_list_for_bluesky, identifier
-                            )
-
-                    if not bluesky_image_blobs:
-                        logger.info(
-                            "BlueSky: Video upload failed or produced no blobs, falling back to static images"
-                        )
-                        # Process images as static PNGs
-                        image_list_for_bluesky = process_images(
-                            outdir, downloaded_image_list, post_gif=False
-                        )
-                        if image_list_for_bluesky:
-                            bluesky_image_blobs = bluesky_upload_media(
-                                bluesky_client, image_list_for_bluesky, identifier
-                            )
-                except Exception as e:
-                    logger.error(f"BlueSky: Error during media processing/upload: {e}")
-                    bluesky_image_blobs = []
-
-                logger.debug(
-                    f"BlueSky media blobs after all attempts: {len(bluesky_image_blobs)} blobs."
-                )
-
-        title = post.title
-        link = post.link
-        if use_arxiv_link and arxiv_id:
-            link = arxiv_link
-
-        prelim_result = False
-        for item in PRELIM:
-            if identifier.find(item) >= 0:
-                prelim_result = True
-                logger.info("This is a preliminary result.")
-
-        conf_hashtags = ""
-        # use only for PAS/CONF notes:
-        if prelim_result:
-            conf_hashtags = " ".join(
-                filter(None, (conf.is_now(post["published"]) for conf in CONFERENCES))
-            )
-            logger.info(f"Conference hashtags: {conf_hashtags}")
-
-        type_hashtag = "New result"
-        if prelim_result:
-            if experiment == "CMS":
-                type_hashtag = "#CMSPAS"
-            else:
-                type_hashtag = f"#{experiment}conf"
-        else:
-            type_hashtag = f"#{experiment}paper"
-            # For initial submission to arXiv there won't be any pictures,
-            # but the submission happens days before the analysis appears on arXiv
-            # while the CDS entry with the arXiv identifier comes after the
-            # availability on arXiv, so let's give people a heads-up of what's coming.
-            if (experiment == "CMS" or experiment == "LHCb") and identifier.startswith(
-                "CERN-EP"
             ):
-                type_hashtag += " soon on arXiv"
+                deliver[platform] = False
+        if not any(deliver.values()):
+            continue
 
-        title_formatted = format_title(title)
-        if sys.version_info[0] < 3:
-            title_formatted = title_formatted.encode("utf8")
+        output_directory = Path(identifier.replace(":", "_"))
+        publication = _prepare_publication_media(
+            publication, post, args.figmax, output_directory
+        )
+        media = prepare_media_sequence(
+            publication,
+            output_directory / "prepared",
+            create_animation=not args.nogif,
+            cover_mode=args.cover_mode,
+        )
+        mastodon_rendered = MastodonRenderer().render(publication)
+        bluesky_rendered = BlueskyRenderer().render(publication)
+        twitter_rendered = render_messages(publication, 280)
+        logger.info("Prepared alt text: %s", media.alt_text)
+        run_summary.add(
+            "prepared",
+            identifier=identifier,
+            figure_count=len(media.plot_paths),
+            cover=bool(media.cover_path),
+            gif=bool(media.gif_path),
+            mp4=bool(media.mp4_path),
+        )
 
-        # title_temp = type_hashtag + ": " + title_formatted + " (" + identifier + ") " + link + " " + conf_hashtags
-        # logger.info(title_temp)
+        twitter_media_ids = []
+        mastodon_media_ids = []
+        bluesky_media = []
+        mastodon_uses_gif = bool(media.gif_path)
+        twitter_uses_gif = bool(media.gif_path)
 
-        # skip entries without media for ATLAS
-        if downloaded_image_list or experiment != "ATLAS":
-            if twitter_client:
-                tweet_count += 1
-                if not dry_run:
-                    tweet_response = tweet(
-                        twitter_client["v2"],
-                        type_hashtag,
-                        title_formatted,
-                        identifier,
-                        link,
-                        conf_hashtags,
-                        phys_hashtags,
-                        twitter_image_ids,
-                        post_gif,
-                        config["AUTH"]["BOT_HANDLE"],
-                    )
-                    if not tweet_response:
-                        # try to recover since something went wrong
-                        # first, try to use individual images instead of GIF
-                        if post_gif:
-                            if downloaded_image_list:
-                                logger.info("Trying to tweet without GIF")
-                                image_list = process_images(
-                                    outdir, downloaded_image_list, post_gif=False
-                                )
-                                twitter_image_ids = twitter_upload_images(
-                                    twitter_client["v1"], image_list, post_gif=False
-                                )
-                                tweet_response = tweet(
-                                    twitter_client["v2"],
-                                    type_hashtag,
-                                    title_formatted,
-                                    identifier,
-                                    link,
-                                    conf_hashtags,
-                                    phys_hashtags,
-                                    twitter_image_ids,
-                                    post_gif=False,
-                                    bot_handle=config["AUTH"]["BOT_HANDLE"],
-                                )
-                        if not tweet_response:
-                            # second, try to tweet without image
-                            logger.info("Trying to tweet without images")
-                            tweet_response = tweet(
-                                twitter_client["v2"],
-                                type_hashtag,
-                                title_formatted,
-                                identifier,
-                                link,
-                                conf_hashtags,
-                                phys_hashtags,
-                                image_ids=[],
-                                post_gif=False,
-                                bot_handle=config["AUTH"]["BOT_HANDLE"],
-                            )
-                    if tweet_response:
-                        store_id(identifier, post["feed_id"], prefix="TWITTER_")
-                else:
-                    logger.info("Tweet information:")
-                    logger.info(title_formatted)
-                    logger.info("identifier: " + identifier)
-                    logger.info("link: " + link)
-                    logger.info("type_hashtag: " + type_hashtag)
-                    logger.info("conf_hashtags: " + conf_hashtags)
-                    logger.info("phys_hashtags: " + phys_hashtags)
-            if mastodon_client:
-                toot_count += 1
-                if not dry_run:
-                    logger.info(
-                        "Waiting 10 seconds before first toot attempt for this item."
-                    )
-                    time.sleep(10)
+        def record_media_failure(platform, reason):
+            logger.error("%s media delivery failed: %s", platform.title(), reason)
+            run_summary.add(
+                "media_failed",
+                platform=platform,
+                identifier=identifier,
+                reason=reason,
+            )
+            run_summary.add(
+                "failed",
+                platform=platform,
+                identifier=identifier,
+                reason="media_upload",
+            )
+            deliver[platform] = False
 
-                    mastodon_image_ids = []
-                    actual_post_gif_for_mastodon = (
-                        post_gif  # Variable to track if GIF is used for this toot
-                    )
-
-                    if downloaded_image_list:
-                        try:
-                            # Attempt 1: Process and upload (possibly as GIF)
-                            logger.info(
-                                f"Mastodon: Initial media processing (post_gif={actual_post_gif_for_mastodon})."
-                            )
-                            image_list_for_mastodon = process_images(
-                                outdir,
-                                downloaded_image_list,
-                                actual_post_gif_for_mastodon,
-                            )
-                            mastodon_image_ids = mastodon_upload_images(
-                                mastodon_client,
-                                image_list_for_mastodon,
-                                actual_post_gif_for_mastodon,
-                            )
-                        except (
-                            mastodon.MastodonError
-                        ) as e:  # Changed from MastodonAPIError to MastodonError
-                            logger.warning(
-                                f"Mastodon: Media upload attempt 1 failed: {e}"
-                            )
-                            # Check if it's the specific API error we want to handle for GIF fallback
-                            if (
-                                actual_post_gif_for_mastodon
-                                and isinstance(e, mastodon.MastodonAPIError)
-                                and hasattr(e, "http_status")
-                                and e.http_status == 422
-                            ):
-                                logger.info(
-                                    "Mastodon: GIF upload failed with 422 (MastodonAPIError). Retrying media upload without GIF."
-                                )
-                                actual_post_gif_for_mastodon = False  # Fallback: No GIF
-                                try:
-                                    # Attempt 2: Process and upload as individual images
-                                    logger.info(
-                                        f"Mastodon: Fallback media processing (post_gif={actual_post_gif_for_mastodon})."
-                                    )
-                                    image_list_for_mastodon_fallback = process_images(
-                                        outdir,
-                                        downloaded_image_list,
-                                        post_gif=False,
-                                    )
-                                    mastodon_image_ids = mastodon_upload_images(
-                                        mastodon_client,
-                                        image_list_for_mastodon_fallback,
-                                        post_gif=False,
-                                    )
-                                except mastodon.MastodonError as e2:
-                                    logger.error(
-                                        f"Mastodon: Media upload fallback attempt failed: {e2}"
-                                    )
-                                    mastodon_image_ids = []  # Failed to upload any media in fallback
-                            else:
-                                # This is a MastodonError that is not the specific 422 GIF error,
-                                # or it was a MastodonAPIError not fitting the criteria.
-                                logger.error(
-                                    f"Mastodon: Unhandled MastodonError or non-422 API error during media upload: {e}"
-                                )
-                                mastodon_image_ids = []  # Failed to upload any media
-                        except Exception as e_generic:  # Catch other potential errors (e.g., from process_images)
-                            logger.error(
-                                f"Mastodon: Unexpected error during media preparation: {e_generic}"
-                            )
-                            mastodon_image_ids = []  # Failed to prepare/upload any media
-
-                # Proceed with tooting attempts
-                toot_response = None
-                max_retry = 10
-                for attempt_num in range(max_retry):
-                    toot_response = toot(
-                        mastodon_client,
-                        type_hashtag,
-                        title_formatted,
-                        identifier,
-                        link,
-                        conf_hashtags,
-                        phys_hashtags,
-                        mastodon_image_ids,  # Use the (possibly empty or fallback) list of IDs
-                        actual_post_gif_for_mastodon,  # Use the final decision on GIF status
-                        config["AUTH"]["MASTODON_BOT_HANDLE"],
-                    )
-                    if toot_response:
-                        store_id(identifier, post["feed_id"], prefix="MASTODON_")
-                        break
-                    # If toot failed, and it's not the last attempt, log and wait
-                    if not toot_response and attempt_num < max_retry - 1:
-                        logger.info(
-                            f"Mastodon: Toot attempt {attempt_num + 1}/{max_retry} failed. Waiting 10 seconds before next attempt."
+        if not args.dry:
+            if deliver["twitter"]:
+                paths = [media.gif_path] if media.gif_path else list(media.static_paths)
+                if paths:
+                    try:
+                        twitter_media_ids = twitter_upload_images(
+                            twitter_client["v1"],
+                            [str(path) for path in paths],
+                            twitter_uses_gif,
                         )
-                        time.sleep(10)
-
-                # Final fallback: If all toot attempts failed and images were originally present (implying media was intended)
-                if not toot_response and downloaded_image_list:
-                    logger.info(
-                        "Mastodon: All toot attempts (possibly with media) failed. Attempting a final toot explicitly without media."
-                    )
-                    final_fallback_toot_response = toot(
-                        mastodon_client,
-                        type_hashtag,
-                        title_formatted,
-                        identifier,
-                        link,
-                        conf_hashtags,
-                        phys_hashtags,
-                        image_ids=[],  # Explicitly no media
-                        post_gif=False,  # GIF status irrelevant here
-                        bot_handle=config["AUTH"]["MASTODON_BOT_HANDLE"],
-                    )
-                    if final_fallback_toot_response:
-                        store_id(identifier, post["feed_id"], prefix="MASTODON_")
-
-        if bluesky_client and do_skeet:
-            skeet_count += 1
-            if not dry_run:
-                logger.info(
-                    "Waiting 5 seconds before first skeet attempt for this item."
+                    except Exception as exception:  # pylint: disable=broad-except
+                        logger.error("Twitter media upload failed: %s", exception)
+                        if media.gif_path and media.static_paths:
+                            twitter_uses_gif = False
+                            try:
+                                twitter_media_ids = twitter_upload_images(
+                                    twitter_client["v1"],
+                                    [str(path) for path in media.static_paths],
+                                    False,
+                                )
+                            except Exception as fallback_exception:  # pylint: disable=broad-except
+                                logger.error(
+                                    "Twitter static media fallback failed: %s",
+                                    fallback_exception,
+                                )
+                    if not twitter_media_ids:
+                        record_media_failure("twitter", "no uploaded media")
+            if deliver["mastodon"]:
+                paths = [media.gif_path] if media.gif_path else list(media.static_paths)
+                if paths:
+                    try:
+                        mastodon_media_ids = mastodon_upload_images(
+                            mastodon_client,
+                            [str(path) for path in paths],
+                            mastodon_uses_gif,
+                            alt_text=media.alt_text,
+                        )
+                    except Exception as exception:  # pylint: disable=broad-except
+                        logger.error("Mastodon media upload failed: %s", exception)
+                        if media.gif_path and media.static_paths:
+                            mastodon_uses_gif = False
+                            try:
+                                mastodon_media_ids = mastodon_upload_images(
+                                    mastodon_client,
+                                    [str(path) for path in media.static_paths],
+                                    False,
+                                    alt_text=media.alt_text,
+                                )
+                            except Exception as fallback_exception:  # pylint: disable=broad-except
+                                logger.error(
+                                    "Mastodon static media fallback failed: %s",
+                                    fallback_exception,
+                                )
+                    if not mastodon_media_ids:
+                        record_media_failure("mastodon", "no uploaded media")
+            if deliver["bluesky"]:
+                paths = ([media.mp4_path] if media.mp4_path else []) + list(
+                    media.static_paths
                 )
-                time.sleep(5)
-
-                skeet_response = skeet(
-                    bluesky_client,
-                    type_hashtag,
-                    title_formatted,
-                    identifier,
-                    link,
-                    conf_hashtags,
-                    phys_hashtags,
-                    bluesky_image_blobs,
-                    config["AUTH"].get("BLUESKY_HANDLE", ""),
-                )
-
-                if not skeet_response and bluesky_image_blobs:
-                    logger.info(
-                        "BlueSky: Skeet with media failed. Attempting skeet without media."
-                    )
-                    time.sleep(5)
-                    skeet_response = skeet(
+                if paths:
+                    bluesky_media = bluesky_upload_media(
                         bluesky_client,
-                        type_hashtag,
-                        title_formatted,
+                        [str(path) for path in paths],
                         identifier,
-                        link,
-                        conf_hashtags,
-                        phys_hashtags,
-                        [],
-                        config["AUTH"].get("BLUESKY_HANDLE", ""),
+                        alt_text=media.alt_text,
                     )
+                    if not bluesky_media:
+                        record_media_failure("bluesky", "no uploaded media")
 
-                if skeet_response:
-                    store_id(identifier, post["feed_id"], prefix="BLUESKY_")
-                    logger.info(
-                        f"BlueSky: Successfully skeeted. URI: {skeet_response.get('uri')}"
-                    )
-                else:
-                    logger.error("BlueSky: All skeet attempts failed for this item.")
-
+        if deliver["twitter"]:
+            if args.dry:
+                for message in twitter_rendered.messages:
+                    logger.info("Twitter dry run: %s", message)
+                run_summary.add("dry_run", platform="twitter", identifier=identifier)
             else:
-                logger.info("BlueSky: Dry run, skeet information:")
-                # Simpler dry run log for BlueSky, focusing on the combined text from split_text
-                temp_message_list_for_dry_run = split_text(
-                    type_hashtag,
-                    title_formatted,
+                response = tweet(
+                    twitter_client["v2"],
+                    "",
+                    publication.title,
                     identifier,
                     link,
-                    conf_hashtags,
-                    phys_hashtags,
-                    300,  # skeet_allowed_length
+                    "",
+                    "",
+                    twitter_media_ids,
+                    twitter_uses_gif,
+                    config["AUTH"].get("BOT_HANDLE", ""),
+                    message_list=twitter_rendered.messages,
+                )
+                if response:
+                    post_id = str(response_value(response, "id"))
+                    ledger.mark(
+                        publication,
+                        "twitter",
+                        post_id=post_id,
+                        content_hash=twitter_rendered.content_hash,
+                    )
+                    run_summary.add("posted", platform="twitter", identifier=identifier)
+                else:
+                    run_summary.add("failed", platform="twitter", identifier=identifier)
+
+        if deliver["mastodon"]:
+            if args.dry:
+                for message in mastodon_rendered.messages:
+                    logger.info("Mastodon dry run: %s", message)
+                run_summary.add("dry_run", platform="mastodon", identifier=identifier)
+            else:
+                response = toot(
+                    mastodon_client,
+                    "",
+                    publication.title,
+                    identifier,
+                    link,
+                    "",
+                    "",
+                    mastodon_media_ids,
+                    mastodon_uses_gif,
+                    config["AUTH"].get("MASTODON_BOT_HANDLE", ""),
+                    message_list=mastodon_rendered.messages,
+                )
+                if response:
+                    post_id = str(response_value(response, "id"))
+                    post_url = str(response_value(response, "url"))
+                    ledger.mark(
+                        publication,
+                        "mastodon",
+                        post_id=post_id,
+                        post_url=post_url,
+                        content_hash=mastodon_rendered.content_hash,
+                    )
+                    run_summary.add(
+                        "posted",
+                        platform="mastodon",
+                        identifier=identifier,
+                        post_url=post_url,
+                    )
+                elif not _adopt_remote_delivery(
+                    publication, "mastodon", config, ledger, run_summary
+                ):
+                    run_summary.add(
+                        "failed", platform="mastodon", identifier=identifier
+                    )
+
+        if deliver["bluesky"]:
+            if args.dry:
+                for message in bluesky_rendered.messages:
+                    logger.info("Bluesky dry run: %s", message)
+                run_summary.add("dry_run", platform="bluesky", identifier=identifier)
+            else:
+                response = skeet(
+                    bluesky_client,
+                    "",
+                    publication.title,
+                    identifier,
+                    link,
+                    "",
+                    "",
+                    bluesky_media,
                     config["AUTH"].get("BLUESKY_HANDLE", ""),
+                    message_list=bluesky_rendered.messages,
                 )
-                for i, dry_message in enumerate(temp_message_list_for_dry_run):
-                    logger.info(f"Skeet part {i + 1} (dry run): {dry_message}")
+                if response:
+                    post_uri = str(response.get("uri", ""))
+                    post_url = bluesky_post_url(
+                        config["AUTH"].get("BLUESKY_HANDLE", ""), post_uri
+                    )
+                    ledger.mark(
+                        publication,
+                        "bluesky",
+                        post_id=post_uri,
+                        post_url=post_url,
+                        content_hash=bluesky_rendered.content_hash,
+                    )
+                    run_summary.add(
+                        "posted",
+                        platform="bluesky",
+                        identifier=identifier,
+                        post_url=post_url,
+                    )
+                elif not _adopt_remote_delivery(
+                    publication, "bluesky", config, ledger, run_summary
+                ):
+                    run_summary.add("failed", platform="bluesky", identifier=identifier)
 
-                logger.info(
-                    f"Number of images prepared for BlueSky (dry run): {len(bluesky_image_blobs)}"
-                )
-                logger.info("Identifier (dry run): " + identifier)
+        posted_count += 1
+        if not args.keep:
+            shutil.rmtree(output_directory, ignore_errors=True)
+        if posted_count >= maximum_posts:
+            break
 
-        if not keep_image_dir:
-            # clean up images
-            shutil.rmtree(outdir)
-        if (
-            tweet_count >= max_tweets
-            or toot_count >= max_tweets
-            or skeet_count >= max_tweets
-        ):  # Updated condition
-            logger.info(f"Reached max posts limit ({max_tweets}). Exiting.")
-            return
+    write_run_summary()
+    if feed_failed or run_summary.required_failures(required_platforms):
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

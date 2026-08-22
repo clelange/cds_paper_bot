@@ -8,23 +8,37 @@ job:on-schedule:
   only:
     - schedules
   image: $CI_REGISTRY_IMAGE
+  resource_group: cds-paper-bot-repository-writer
+  interruptible: false
+  timeout: 20 minutes
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
   before_script:
     - ls -lisa
     - ./.gitlab/before_script.sh
   script:
     - ./.gitlab/script.sh
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths:
+      - run-summary.json
 
 update_repo:
   stage: update
-  only:
-    - web
+  resource_group: cds-paper-bot-repository-writer
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web" && $BUILD_IMAGE != "true"'
   script:
     - ./.gitlab/update_repo.sh
 
 build_kaniko_command:
   stage: build
-  only:
-    - web
+  rules:
+    - if: '$BUILD_IMAGE == "true"'
   variables:
     # To push to a specific docker tag other than latest(the default), amend the --destination parameter, e.g. --destination $CI_REGISTRY_IMAGE:$CI_BUILD_REF_NAME
     # See https://docs.gitlab.com/ee/ci/variables/predefined_variables.html#variables-reference for available variables

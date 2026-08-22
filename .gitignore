@@ -1,5 +1,6 @@
 # ignore authentication file
 auth.ini
+run-summary.json
 .DS_Store
 .direnv
 # Byte-compiled / optimized / DLL files

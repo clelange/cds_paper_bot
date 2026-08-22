@@ -1,9 +1,8 @@
 #!/bin/bash
-# exit when any command fails
-set -e
-# echo on
-set -x
-git checkout master
+set -euo pipefail
+set +x
+git fetch origin master
+git checkout -B master origin/master
 git remote add upstream https://github.com/clelange/cds_paper_bot.git
 git fetch upstream
 if [[ -n $(git log ..upstream/master) ]]; then
@@ -11,19 +10,15 @@ if [[ -n $(git log ..upstream/master) ]]; then
     mkdir -p ~/.ssh
     chmod 700 ~/.ssh
     eval "$(ssh-agent -s)"
-    set -x
-    ssh-add <(echo "$GIT_SSH_PRIV_KEY")
-    echo "$GIT_SSH_PRIV_KEY" > ~/.ssh/id_rsa
-    set +x
-    chmod 600 ~/.ssh/id_rsa
+    ssh-add <(printf "%s\n" "$GIT_SSH_PRIV_KEY")
     ssh-keyscan -p 7999 gitlab.cern.ch > ~/.ssh/known_hosts
-    set -x
     git config --global user.email "${GITMAIL}"
     git config --global user.name "${GITNAME}"
-    set +x
     git merge upstream/master -m "merge with upstream"
     git remote set-url origin "${REMOTE_GIT_REPO}"
-    git push origin HEAD
+    # The push pipeline builds the commit that was just synchronized. Building in
+    # this web pipeline would use its older, immutable CI_COMMIT_SHA checkout.
+    git push -o ci.variable="BUILD_IMAGE=true" origin HEAD:master
 else
     echo "No changes found."
 fi
