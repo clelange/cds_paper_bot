@@ -31,6 +31,7 @@ import tweepy
 from atproto import Client as BlueskyClient
 from atproto import models as atproto_models
 from atproto.exceptions import AtProtocolError as BlueskyAtpApiError
+from atproto.exceptions import NetworkError as BlueskyNetworkError
 from pylatexenc.latex2text import LatexNodes2Text
 from pylatexenc.latexwalker import LatexWalkerError
 
@@ -549,8 +550,12 @@ def mastodon_auth(auth_dict):
     return mastodon_client
 
 
-def bluesky_auth(auth_dict):
-    """Authenticate to BlueSky."""
+def bluesky_auth(
+    auth_dict,
+    retries=REQUEST_RETRIES,
+    retry_delay=REQUEST_RETRY_DELAY,
+):
+    """Authenticate to BlueSky, retrying transient network failures."""
     # Assuming atproto is installed, so direct check for credentials.
     if "BLUESKY_HANDLE" not in auth_dict or "BLUESKY_APP_PASSWORD" not in auth_dict:
         logger.info(
@@ -558,20 +563,45 @@ def bluesky_auth(auth_dict):
         )
         return None
 
-    bluesky_client = None
-    try:
+    attempts = max(1, retries)
+    for attempt in range(1, attempts + 1):
         bluesky_client = BlueskyClient()
-        bluesky_client.login(
-            auth_dict["BLUESKY_HANDLE"], auth_dict["BLUESKY_APP_PASSWORD"]
-        )
-        logger.info(
-            f"Successfully logged into BlueSky as {auth_dict['BLUESKY_HANDLE']}"
-        )
-    except Exception as bluesky_exception:
-        logger.error(f"BlueSky auth error: {bluesky_exception}")
-        # We don't sys.exit here to allow other platforms to continue
+        try:
+            bluesky_client.login(
+                auth_dict["BLUESKY_HANDLE"], auth_dict["BLUESKY_APP_PASSWORD"]
+            )
+            logger.info(
+                "Successfully logged into BlueSky as %s",
+                auth_dict["BLUESKY_HANDLE"],
+            )
+            return bluesky_client
+        except BlueskyNetworkError as bluesky_exception:
+            if attempt < attempts:
+                logger.warning(
+                    "Transient BlueSky auth failure (attempt=%d/%d): %s: %r",
+                    attempt,
+                    attempts,
+                    bluesky_exception.__class__.__name__,
+                    bluesky_exception,
+                )
+                time.sleep(retry_delay)
+                continue
+            logger.exception(
+                "BlueSky authentication failed after %d attempts: %s: %r",
+                attempts,
+                bluesky_exception.__class__.__name__,
+                bluesky_exception,
+            )
+        except Exception as bluesky_exception:  # pylint: disable=broad-except
+            logger.exception(
+                "BlueSky authentication failed without retry: %s: %r",
+                bluesky_exception.__class__.__name__,
+                bluesky_exception,
+            )
+        # Do not exit here, so the other configured platforms can continue.
         return None
-    return bluesky_client
+
+    return None
 
 
 def load_config(experiment, feed_file, auth_file):
