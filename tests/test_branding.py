@@ -106,3 +106,53 @@ def test_missing_or_corrupt_logo_falls_back_to_text_card(tmp_path, monkeypatch):
     output = render_branded_cover(publication(), tmp_path / "fallback.png")
     with Image.open(output) as card:
         assert card.size == (1280, 720)
+
+
+@pytest.mark.parametrize(
+    ("experiment", "title"),
+    [
+        (
+            "CMS",
+            (
+                "Search for the rare Higgs boson decay H → Zγ in proton-proton "
+                "collisions at √(s) = 13 and 13.6 TeV"
+            ),
+        ),
+        (
+            "LHCb",
+            (
+                "Stringent limits on CPT- and Lorentz-invariance violation from "
+                "B⁰_s meson decays"
+            ),
+        ),
+        ("LHCb", "Strong constraints on the K⁰_s → μ⁺ μ⁻ branching fraction"),
+        ("CMS", "Measurement of γγ → τ⁺τ⁻ and J/ψ, Υ, χ, Λ, η, π and t̅ production"),
+    ],
+)
+def test_cover_fonts_render_physics_symbols(tmp_path, monkeypatch, experiment, title):
+    original_text = ImageDraw.ImageDraw.text
+    rendered_symbols = set()
+
+    def check_glyphs(draw, xy, text, *args, **kwargs):
+        font = kwargs["font"]
+        missing_glyph = font.getmask("\uffff")
+        missing_signature = (missing_glyph.size, bytes(missing_glyph))
+        for character in text:
+            if ord(character) < 128:
+                continue
+            glyph = font.getmask(character)
+            assert (glyph.size, bytes(glyph)) != missing_signature, repr(character)
+            assert glyph.getbbox() is not None, repr(character)
+            rendered_symbols.add(character)
+        return original_text(draw, xy, text, *args, **kwargs)
+
+    monkeypatch.setattr(ImageDraw.ImageDraw, "text", check_glyphs)
+    render_branded_cover(publication(experiment, title), tmp_path / "cover.png")
+    assert rendered_symbols == {
+        character for character in title if ord(character) > 127
+    }
+
+
+def test_missing_cover_fonts_fail_instead_of_rendering_boxes(tmp_path):
+    with pytest.raises(OSError, match="Install fonts-dejavu-core"):
+        branding._font((tmp_path / "missing.ttf",), 30)

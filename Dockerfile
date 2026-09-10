@@ -19,6 +19,7 @@ ENV PACKAGES="\
   git \
   openssh-client \
   ffmpeg \
+  fonts-dejavu-core \
   "
 
 COPY requirements.txt /tmp/requirements.txt

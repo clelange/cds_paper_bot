@@ -67,6 +67,12 @@ python cds_paper_bot.py --help
 
 Logo files and their sources are documented in [`img/logos/README.md`](img/logos/README.md). They are bundled with the image and are never fetched at runtime.
 
+Animation covers are shown for four seconds and each plot for two seconds. Cover
+rendering requires a Unicode font: the Docker image installs `fonts-dejavu-core`.
+For a local Linux installation, install that package too; macOS uses Arial Unicode.
+Missing fonts cause an explicit error so that physics symbols are not silently
+replaced by boxes in images or videos.
+
 Note: if this doesn't work on MacOS, make sure to `brew install freetype imagemagick`
 and `export MAGICK_HOME=/opt/homebrew/opt/imagemagick`.
 
