@@ -51,11 +51,12 @@ DEFAULT_BRAND = ExperimentBrand(
 
 FONT_REGULAR_CANDIDATES = (
     Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
-    Path("/System/Library/Fonts/Supplemental/Arial.ttf"),
+    Path("/System/Library/Fonts/Supplemental/Arial Unicode.ttf"),
 )
 FONT_BOLD_CANDIDATES = (
     Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
-    Path("/System/Library/Fonts/Supplemental/Arial Bold.ttf"),
+    # macOS Arial Bold lacks the superscript charges used in particle names.
+    Path("/System/Library/Fonts/Supplemental/Arial Unicode.ttf"),
 )
 
 
@@ -100,7 +101,12 @@ def _font(candidates: tuple[Path, ...], size: int) -> ImageFont.ImageFont:
     for candidate in candidates:
         if candidate.exists():
             return ImageFont.truetype(str(candidate), size=size)
-    return ImageFont.load_default(size=size)
+    # Pillow's default font replaces Greek letters and physics symbols with
+    # missing-glyph boxes, which then get baked into every GIF/MP4 cover.
+    raise OSError(
+        "No Unicode cover font found. Install fonts-dejavu-core (Linux) or "
+        "Arial Unicode (macOS). Tried: " + ", ".join(str(path) for path in candidates)
+    )
 
 
 def _wrap_text(

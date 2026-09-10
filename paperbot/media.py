@@ -6,13 +6,14 @@ import logging
 import math
 import re
 import subprocess
+from collections.abc import Iterable, Sequence
 from pathlib import Path
-from typing import Iterable, Sequence
 
 from PIL import Image as PillowImage
 from PIL import ImageOps
 from wand.exceptions import WandException
-from wand.image import Color, Image as WandImage
+from wand.image import Color
+from wand.image import Image as WandImage
 
 from .branding import get_experiment_brand, render_branded_cover
 from .models import CoverPolicy, MediaSequence, Publication
@@ -24,7 +25,8 @@ MAX_PLOT_DIMENSION = 1000
 MAX_PLOT_AREA = 1280 * 720
 MAX_ANIMATION_SIZE = 5 * 1024 * 1024
 COVER_DURATION_MS = 4000
-PLOT_DURATION_MS = 3000
+# Match the original ImageMagick `convert -delay 200` (centiseconds).
+PLOT_DURATION_MS = 2000
 FORMAT_PRIORITY = {".png": 4, ".jpg": 3, ".jpeg": 3, ".webp": 2, ".pdf": 1}
 
 
@@ -295,10 +297,10 @@ def media_alt_text(
     frame_order = "a cover followed by " if cover_included else ""
     if animated:
         timing = (
-            " The cover is shown for about four seconds and each figure for about three "
+            " The cover is shown for about four seconds and each figure for about two "
             "seconds."
             if cover_included
-            else " Each figure is shown for about three seconds."
+            else " Each figure is shown for about two seconds."
         )
         return bounded(
             lambda title: (

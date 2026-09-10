@@ -1,16 +1,19 @@
 from __future__ import annotations
 
+import json
+import subprocess
 from pathlib import Path
 
+import pytest
 from PIL import Image
 
 from paperbot.media import (
     create_gif,
     deduplicate_media,
+    media_alt_text,
     natural_sort_key,
     normalize_plot,
     order_media,
-    media_alt_text,
     prepare_media_sequence,
     select_cover,
 )
@@ -56,13 +59,15 @@ def test_scientific_plot_normalization_adds_no_branding_or_crop(tmp_path):
         assert red > 190 and green < 40 and blue < 50
 
 
-def test_animation_frame_timing_and_size_fallback(tmp_path):
+@pytest.mark.parametrize("include_cover", [True, False])
+def test_animation_frame_timing_and_size_fallback(tmp_path, include_cover):
     cover = tmp_path / "cover.png"
     plot_1 = tmp_path / "plot-1.png"
     plot_2 = tmp_path / "plot-2.png"
     Image.new("RGB", (320, 180), "white").save(cover)
     Image.new("RGB", (320, 180), "red").save(plot_1)
     Image.new("RGB", (320, 180), "blue").save(plot_2)
+    cover = cover if include_cover else None
     gif, retained = create_gif(cover, [plot_1, plot_2], tmp_path / "animation.gif")
     assert gif and retained == (plot_1, plot_2)
     with Image.open(gif) as animation:
@@ -70,7 +75,7 @@ def test_animation_frame_timing_and_size_fallback(tmp_path):
         for frame in range(animation.n_frames):
             animation.seek(frame)
             durations.append(animation.info["duration"])
-        assert durations == [4000, 3000, 3000]
+        assert durations == ([4000] if include_cover else []) + [2000, 2000]
     too_small, retained = create_gif(
         cover, [plot_1, plot_2], tmp_path / "tiny.gif", maximum_size=10
     )
@@ -123,6 +128,24 @@ def test_shared_animation_is_converted_to_mp4_exactly_once(tmp_path, monkeypatch
     assert sequence.gif_path and sequence.mp4_path
     assert len(calls) == 1
     assert calls[0][0] == sequence.gif_path
+    probe = subprocess.run(
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "json",
+            str(sequence.mp4_path),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert float(json.loads(probe.stdout)["format"]["duration"]) == pytest.approx(
+        8, abs=0.1
+    )
 
 
 def test_long_alt_text_retains_timing_count_and_source_location():
@@ -137,5 +160,11 @@ def test_long_alt_text_retains_timing_count_and_source_location():
     alt_text = media_alt_text(item, 12, cover_included=True, animated=True)
     assert len(alt_text) <= 500
     assert "12 figures" in alt_text
-    assert "four seconds" in alt_text and "three seconds" in alt_text
+    assert "four seconds" in alt_text and "two seconds" in alt_text
     assert "linked record provides the original files" in alt_text
+
+
+def test_plot_only_alt_text_describes_two_second_timing():
+    alt_text = media_alt_text(publication(), 2, cover_included=False, animated=True)
+    assert "Each figure is shown for about two seconds." in alt_text
+    assert "cover" not in alt_text
