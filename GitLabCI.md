@@ -57,3 +57,7 @@ Now add a couple of variables, see [feeds.ini](https://github.com/clelange/cds_p
 | `BLUESKY_APP_PASSWORD`  | Bluesky app password (not the account password)               |
 
 Only configured platforms are used. For the current CMS deployment, configure Mastodon and Bluesky together; Twitter/X credentials can be omitted.
+
+Mastodon GIF uploads are processed asynchronously. The bot polls the accepted attachment until its full-size URL is available before creating the post. Processing errors or an exhausted polling timeout use the existing static-image fallback. Transient network and server errors during polling retry the same attachment; uploads and status creation are not blindly repeated.
+
+Optional CI variables `MASTODON_REQUEST_TIMEOUT` (default 30 seconds), `MASTODON_MEDIA_TIMEOUT` (default 120 seconds), and `MASTODON_MEDIA_POLL_INTERVAL` (default 2 seconds) control each HTTP request, the processing wait, and the interval between checks. Timeouts are checked between polling requests; each in-flight HTTP request has its own timeout.
