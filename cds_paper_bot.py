@@ -51,6 +51,10 @@ REQUEST_TIMEOUT = float(os.getenv("CDS_REQUEST_TIMEOUT", "10"))
 REQUEST_RETRIES = int(os.getenv("CDS_REQUEST_RETRIES", "3"))
 REQUEST_RETRY_DELAY = float(os.getenv("CDS_REQUEST_RETRY_DELAY", "2"))
 
+MASTODON_REQUEST_TIMEOUT = float(os.getenv("MASTODON_REQUEST_TIMEOUT", "30"))
+MASTODON_MEDIA_TIMEOUT = float(os.getenv("MASTODON_MEDIA_TIMEOUT", "120"))
+MASTODON_MEDIA_POLL_INTERVAL = float(os.getenv("MASTODON_MEDIA_POLL_INTERVAL", "2"))
+
 
 def get_twitter_conn_v1(
     api_key, api_secret, access_token, access_token_secret
@@ -542,6 +546,7 @@ def mastodon_auth(auth_dict):
         mastodon_client = mastodon.Mastodon(
             access_token=auth_dict["MASTODON_ACCESS_TOKEN"],
             api_base_url=api_base_url,
+            request_timeout=MASTODON_REQUEST_TIMEOUT,
         )
     except Exception as mastodon_exception:  # pylint: disable=broad-except
         logger.error(f"Mastodon auth error: {mastodon_exception}")
@@ -663,40 +668,74 @@ def twitter_upload_images(twitter, image_list, post_gif):
     return image_ids
 
 
+def _wait_for_mastodon_media(
+    mastodon_client,
+    response,
+    timeout=MASTODON_MEDIA_TIMEOUT,
+    poll_interval=MASTODON_MEDIA_POLL_INTERVAL,
+):
+    """Wait for an accepted attachment to become usable before posting it."""
+    media_id = response_value(response, "id")
+    if response_value(response, "url"):
+        return media_id
+
+    deadline = time.monotonic() + timeout
+    logger.info("Waiting for Mastodon media %s to finish processing", media_id)
+    while not response_value(response, "url"):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise mastodon.MastodonError(
+                f"Mastodon media {media_id} processing timed out after {timeout}s"
+            )
+        time.sleep(min(max(0.1, poll_interval), remaining))
+        if time.monotonic() >= deadline:
+            raise mastodon.MastodonError(
+                f"Mastodon media {media_id} processing timed out after {timeout}s"
+            )
+        try:
+            response = mastodon_client.media(media_id)
+        except (
+            mastodon.MastodonNetworkError,
+            mastodon.MastodonServerError,
+        ) as exception:
+            logger.warning("Transient Mastodon media polling failure: %s", exception)
+        except mastodon.MastodonAPIError as exception:
+            # Mastodon.py 1.8.1 tries to parse the empty HTTP 206 processing
+            # response as JSON. Only this specific parse error means pending.
+            if not str(exception).startswith(
+                "Could not parse response as JSON, response code was 206,"
+            ):
+                raise
+    logger.info("Mastodon media %s finished processing", media_id)
+    return media_id
+
+
 def mastodon_upload_images(mastodon_client, image_list, post_gif, alt_text=""):
-    """Upload images to Mastodon and return locations."""
+    """Upload media and return only attachment IDs ready for posting."""
     logger.info("Uploading images to Mastodon.")
     image_ids = []
     # loop over sorted images to get the plots in the right order
     for image_path in sorted(image_list):
-        if post_gif:
-            if image_path.endswith("gif"):
-                try:
-                    response = mastodon_client.media_post(
-                        media_file=image_path,
-                        description=alt_text
-                        or f"Animated GIF image for {image_path.split('/')[0]}",
-                    )
-                except mastodon.MastodonError as mastodon_exception:
-                    logger.error(
-                        f"Mastodon: Failed to upload media {image_path}. Error: {mastodon_exception}"
-                    )
-                    raise mastodon_exception
-                logger.info(response)
-                image_ids.append(response.id)
-        else:
-            try:
-                response = mastodon_client.media_post(
-                    media_file=image_path,
-                    description=alt_text or f"Image for {image_path.split('/')[0]}",
-                )
-            except mastodon.MastodonError as mastodon_exception:
-                logger.error(
-                    f"Mastodon: Failed to upload media {image_path}. Error: {mastodon_exception}"
-                )
-                raise mastodon_exception
-            logger.info(response)
-            image_ids.append(response.id)
+        if post_gif and not image_path.endswith("gif"):
+            continue
+        description = alt_text or (
+            f"Animated GIF image for {image_path.split('/')[0]}"
+            if post_gif
+            else f"Image for {image_path.split('/')[0]}"
+        )
+        try:
+            response = mastodon_client.media_post(
+                media_file=image_path,
+                description=description,
+            )
+            image_ids.append(_wait_for_mastodon_media(mastodon_client, response))
+        except mastodon.MastodonError as mastodon_exception:
+            logger.error(
+                "Mastodon: Failed to prepare media %s. Error: %s",
+                image_path,
+                mastodon_exception,
+            )
+            raise
     logger.info(image_ids)
     return image_ids
 
