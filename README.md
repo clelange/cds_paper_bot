@@ -79,6 +79,9 @@ and `export MAGICK_HOME=/opt/homebrew/opt/imagemagick`.
 ## Docker image
 
 If you would like to run the bot in an isolated environment, e.g. on a Raspberry Pi, you can try to use the [Dockerfile](Dockerfile).
+The image uses Python 3.13, which supports the pinned Pillow 13 release. Local
+installations require Python 3.11 or newer.
+
 Build the container using:
 
 ```shell
