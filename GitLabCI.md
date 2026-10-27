@@ -61,3 +61,10 @@ Only configured platforms are used. For the current CMS deployment, configure Ma
 Mastodon GIF uploads are processed asynchronously. The bot polls the accepted attachment until its full-size URL is available before creating the post. Processing errors or an exhausted polling timeout use the existing static-image fallback. Transient network and server errors during polling retry the same attachment; uploads and status creation are not blindly repeated.
 
 Optional CI variables `MASTODON_REQUEST_TIMEOUT` (default 30 seconds), `MASTODON_MEDIA_TIMEOUT` (default 120 seconds), and `MASTODON_MEDIA_POLL_INTERVAL` (default 2 seconds) control each HTTP request, the processing wait, and the interval between checks. Timeouts are checked between polling requests; each in-flight HTTP request has its own timeout.
+
+RSS generation can be slower than media requests. `CDS_FEED_TIMEOUT` controls the
+RSS timeout per attempt (default 60 seconds); `CDS_REQUEST_TIMEOUT` keeps its
+10-second default for other CDS requests. Both use `CDS_REQUEST_RETRIES` (default
+3) and `CDS_REQUEST_RETRY_DELAY` (default 2 seconds). If CDS remains unreachable,
+the job still fails and records `feed_failed` in `run-summary.json`; a dependency
+or image update cannot restore an unavailable CDS service.

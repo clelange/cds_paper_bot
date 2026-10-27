@@ -48,6 +48,7 @@ daiquiri.setup(level=logging.INFO)
 logger = daiquiri.getLogger()  # pylint: disable=invalid-name
 
 REQUEST_TIMEOUT = float(os.getenv("CDS_REQUEST_TIMEOUT", "10"))
+FEED_TIMEOUT = float(os.getenv("CDS_FEED_TIMEOUT", "60"))
 REQUEST_RETRIES = int(os.getenv("CDS_REQUEST_RETRIES", "3"))
 REQUEST_RETRY_DELAY = float(os.getenv("CDS_REQUEST_RETRY_DELAY", "2"))
 
@@ -342,6 +343,7 @@ def read_feed(rss_url, feed_id=None, experiment=None):
         phase="RSS",
         experiment=experiment,
         feed_id=feed_id,
+        timeout=FEED_TIMEOUT,
     )
     if response is None:
         return
