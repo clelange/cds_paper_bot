@@ -132,3 +132,43 @@ def test_download_media_url_removes_partial_file(monkeypatch, tmp_path, caplog):
     )
     assert not out_path.exists()
     assert "Failed while streaming media download" in caplog.text
+
+
+def test_read_feed_allows_slow_rss_without_extending_media_timeouts(monkeypatch):
+    """CDS feeds can take longer than the normal ten-second request budget."""
+    calls = []
+
+    def fake_get(url, timeout, stream):
+        calls.append(timeout)
+        if timeout < 30:
+            raise requests.ReadTimeout("RSS generation took thirty seconds")
+        return FakeResponse(
+            content=(
+                b'<rss version="2.0"><channel><title>CMS Papers</title>'
+                b"<item><title>A measurement</title></item></channel></rss>"
+            )
+        )
+
+    monkeypatch.setattr(cds_paper_bot.requests, "get", fake_get)
+    feed = cds_paper_bot.read_feed("https://cds.cern.ch/rss", feed_id="CMS_PAPER_FEED")
+
+    assert [entry.title for entry in feed.entries] == ["A measurement"]
+    assert calls == [cds_paper_bot.FEED_TIMEOUT]
+    assert cds_paper_bot.REQUEST_TIMEOUT == 10
+
+
+def test_read_feed_still_fails_after_exhausting_timeouts(monkeypatch, caplog):
+    """A persistent CDS outage remains a failed feed rather than an empty success."""
+    calls = []
+
+    def fake_get(url, timeout, stream):
+        calls.append(timeout)
+        raise requests.ReadTimeout("CDS unavailable")
+
+    monkeypatch.setattr(cds_paper_bot.requests, "get", fake_get)
+    monkeypatch.setattr(cds_paper_bot.time, "sleep", lambda _seconds: None)
+    caplog.set_level(logging.WARNING)
+
+    assert cds_paper_bot.read_feed("https://cds.cern.ch/rss") is None
+    assert calls == [cds_paper_bot.FEED_TIMEOUT] * cds_paper_bot.REQUEST_RETRIES
+    assert "Giving up request" in caplog.text
